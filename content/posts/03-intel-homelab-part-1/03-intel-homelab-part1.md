@@ -42,7 +42,7 @@ Later, I added five **Dell Wyse 3040** thin clients to build a Raspberry Pi-styl
 
 | NUC 8i3BEH in Akasa case | NUC/Dell Wyse cluster | Double NUC setup |
 |:------------------------:|:---------------------:|:----------------:|
-| ![NUC 8i3BEH in Akasa case](nuc-open.jpg) | ![NUC/Dell Wyse cluster](3dell-1nuc.jpg) | ![NUC 8i3BEH in Akasa case](2nuc.jpg) |
+| ![NUC 8i3BEH in Akasa case](/static/images/post-03/nuc-open.jpg) | ![NUC/Dell Wyse cluster](/static/images/post-03/3dell-1nuc.jpg) | ![NUC 8i3BEH in Akasa case](/static/images/post-03/2nuc.jpg) |
 
 ---
 
@@ -83,7 +83,7 @@ _Inspired by this article: [Fractal Design North Case with maxxed out air coolin
 
 | Case internals | Workspace view |
 |:--------------:|:-------------:|
-| ![Case internals](arc-front.jpeg) | ![Workspace view](desk.png) |
+| ![Case internals](/static/images/post-03/arc-front.jpeg) | ![Workspace view](/static/images/post-03/desk.png) |
 
 ---
 

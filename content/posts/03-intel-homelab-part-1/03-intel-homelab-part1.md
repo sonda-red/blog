@@ -83,7 +83,7 @@ _Inspired by this article: [Fractal Design North Case with maxxed out air coolin
 
 | Case internals | Workspace view |
 |:--------------:|:-------------:|
-| ![Case internals](/static/images/post-03/arc-front.jpeg) | ![Workspace view](/static/images/post-03/desk.png) |
+| ![Case internals](images/post-03/arc-front.jpeg) | ![Workspace view](images/post-03/desk.png) |
 
 ---
 

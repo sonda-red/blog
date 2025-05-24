@@ -1,5 +1,5 @@
 +++
-author = "System Scribe"
+author = "Kalin Daskalov"
 title = "wrigo"
 date = "2023-09-04"
 description = "helper tool for new hugo posts"

@@ -1,5 +1,5 @@
 +++
-authors = ["System Scribe"]
+authors = ["Kalin Daskalov"]
 title = "init"
 date = "2023-07-17"
 description = "hello from my blog"

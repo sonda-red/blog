@@ -22,15 +22,15 @@ Later, I added five **Dell Wyse 3040** thin clients to build a Raspberry Pi-styl
 
 My Linux journey started at 14 with a scratched OpenSUSE DVD and a broken GUI. I didn’t know who gave it to me or what version it was, but that terminal-only experience stuck. Homelabbing became my way of learning, and it’s the reason I landed my first DevOps job. What started as a hobby turned into a career and I still see great value in testing things out at home.
 
-I’m not an AI expert, but I want to explore AI from a DevOps perspective. I want to understand how to run AI workloads, how to orchestrate them, and how to integrate them into a Kubernetes cluster.
+I want to explore AI from a DevOps perspective - how to run AI workloads, how to orchestrate them, and how to integrate them into a Kubernetes cluster.
 
 ---
 
 ## Why Intel-Only?
 
-The short answer: **use what I own, and maximize price-to-VRAM**. Intel Arc GPUs aren't mainstream, but they offer solid specs for the cost. Instead of chasing cloud credits or NVIDIA hardware, I chose to explore what Intel can do.
+The short answer: **use what I own, and maximize price-to-VRAM**. Intel Arc GPUs aren't mainstream, but they offer solid specs for the cost if we consider the mantra that VRAM is King. Instead of chasing cloud credits or NVIDIA hardware, I chose to explore what Intel can do just because of the fun of it.
 
-I expected it to be hard from my initial research online. Lack of documentation or best practices on how to deal with this hardware reminded me of my early Arch Linux installs, but it’s the intense troubleshooting that makes things click eventually. In this new AI era, I'm honestly clueless about how to do things right. I want to learn by doing, not just reading. As reassurance, I told myself that a bit more troubleshooting will probably get me more familiar with the internals than just everything working out of the box.
+I expected it to be hard from my initial research online. Lack of documentation or best practices on how to deal with this hardware, not to mention the general warning signs from the community to just stay away. All this reminded me of my early Arch Linux installs, but it’s the intense troubleshooting that makes things click eventually on a bit of a deeper level than just copying steps from a guide. And in this new AI era, I'm honestly clueless about how to do things right. As reassurance, I told myself that a bit more tinkering will probably get me more familiar with the internals than just everything working out of the box.
 
 ---
 
@@ -40,7 +40,7 @@ At the time of writing, the new [Arc Pro B60](https://www.intel.com/content/www/
 
 ## Why Two Arc GPUs?
 
-AI workloads are VRAM-hungry. At 16GB per card, Intel Arc’s wide 256-bit bus delivers 560GB/s bandwidth. Multi-GPU setups improve throughput, especially with larger models (7B–14B). It’s a cost-effective way to get started with AI workloads on a budget and running at least some of the popular models locally.
+AI workloads are VRAM-hungry. At 16GB per card, Intel Arc’s wide 256-bit bus delivers 560GB/s bandwidth. Multi-GPU setups improve throughput, especially with larger models (7B–14B) but in the next posts I'll shere there's a really big "IT DEPENDS" in all of this. Regardless, it’s a cost-effective way to get started with AI workloads on a budget and running at least some of the popular models locally.
 
 Arc doesn’t have the software maturity of NVIDIA. I'm not here to advocate—honestly (yet), it's a bet that the ecosystem will mature, and it's not certain the pain points will be solved. But I want to explore how well these chips work in a Kubernetes environment, how to set up multi-GPU workloads, and how to optimize them for performance, etc.
 
@@ -50,7 +50,7 @@ Arc doesn’t have the software maturity of NVIDIA. I'm not here to advocate—h
 
 The NUCs were great for learning Kubernetes, but when the world started buzzing about AI, I realized they were underpowered for the new workloads. I needed more VRAM and compute power to run LLMs and image generation models effectively.
 
-Initially, I debated adding a third NUC but realized that by 2024, they were overpriced. So I budgeted **250 EUR/month**, hunted discounts, and built a powerful Intel workstation over six months for ~**1500 EUR**.
+Initially, I debated adding a third NUC but realized that by 2024, they were overpriced, nor did I need a third one for workloads exactly. I just had a dream of having 3 NUC masters for my cluster. I didn't want to force this decision, so instead of spluring, I budgeted **250 EUR/month**, hunted discounts, and built a powerful Intel workstation over six months for ~**1500 EUR**.
 
 [Full PC Part List](https://pcpartpicker.com/list/gkqsLc)
 

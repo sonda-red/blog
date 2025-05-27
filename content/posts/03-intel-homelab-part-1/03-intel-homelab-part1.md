@@ -6,6 +6,18 @@ description = "This is the first in a technical series documenting the creation 
 tags = ["k8s", "mlops", "intel", "homelab", "devops", "gpu", "arc", "a770", "intel-arc", "kubernetes"]
 +++
 
+## The Hardware Journey
+
+In 2018, when my laptop died, I picked up an **Intel NUC 8i3BEH**. It was compact, efficient, and eventually got repurposed into a Docker/K8s node. My wife got one too. When the fan failed (twice), I replaced the chassis with a fanless Akasa case and turned it into a headless server.
+
+Later, I added five **Dell Wyse 3040** thin clients to build a Raspberry Pi-style HA cluster. The NUC did the heavy lifting, the Wyses ran the control plane. But performance was lacking, and eventually, when my wife's NUC fan failed as well, I consolidated down to two NUCs: one control plane and one worker.
+
+| NUC 8i3BEH in Akasa case | NUC/Dell Wyse cluster | Double NUC setup |
+|:------------------------:|:---------------------:|:----------------:|
+| ![NUC 8i3BEH in Akasa case](/images/post-03/nuc-open.jpg) | ![NUC/Dell Wyse cluster](/images/post-03/3dell-1nuc.jpg) | ![NUC 8i3BEH in Akasa case](/images/post-03/2nuc.jpg) |
+
+---
+
 # Why Build This Homelab?
 
 My Linux journey started at 14 with a scratched OpenSUSE DVD and a broken GUI. I didn’t know who gave it to me or what version it was, but that terminal-only experience stuck. Homelabbing became my way of learning, and it’s the reason I landed my first DevOps job. What started as a hobby turned into a career and I still see great value in testing things out at home.
@@ -31,18 +43,6 @@ At the time of writing, the new [Arc Pro B60](https://www.intel.com/content/www/
 AI workloads are VRAM-hungry. At 16GB per card, Intel Arc’s wide 256-bit bus delivers 560GB/s bandwidth. Multi-GPU setups improve throughput, especially with larger models (7B–14B). It’s a cost-effective way to get started with AI workloads on a budget and running at least some of the popular models locally.
 
 Arc doesn’t have the software maturity of NVIDIA. I'm not here to advocate—honestly (yet), it's a bet that the ecosystem will mature, and it's not certain the pain points will be solved. But I want to explore how well these chips work in a Kubernetes environment, how to set up multi-GPU workloads, and how to optimize them for performance, etc.
-
----
-
-## The Hardware Journey
-
-In 2018, when my laptop died, I picked up an **Intel NUC 8i3BEH**. It was compact, efficient, and eventually got repurposed into a Docker/K8s node. My wife got one too. When the fan failed (twice), I replaced the chassis with a fanless Akasa case and turned it into a headless server.
-
-Later, I added five **Dell Wyse 3040** thin clients to build a Raspberry Pi-style HA cluster. The NUC did the heavy lifting, the Wyses ran the control plane. But performance was lacking, and eventually, when my wife's NUC fan failed as well, I consolidated down to two NUCs: one control plane and one worker.
-
-| NUC 8i3BEH in Akasa case | NUC/Dell Wyse cluster | Double NUC setup |
-|:------------------------:|:---------------------:|:----------------:|
-| ![NUC 8i3BEH in Akasa case](/images/post-03/nuc-open.jpg) | ![NUC/Dell Wyse cluster](/images/post-03/3dell-1nuc.jpg) | ![NUC 8i3BEH in Akasa case](/images/post-03/2nuc.jpg) |
 
 ---
 

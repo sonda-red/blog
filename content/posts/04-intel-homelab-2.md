@@ -7,6 +7,7 @@ categories = ["lab notes"]
 tags = ["k3s", "homelab", "storage", "architecture"]
 +++
 
+> Link to Part 1: [Assembling an Intel-Powered Lab](https://blog.sonda.red/posts/03-intel-homelab-1/)
 
 ## Table of Contents
 - [Table of Contents](#table-of-contents)

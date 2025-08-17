@@ -3,7 +3,7 @@ authors = ["Kalin Daskalov"]
 title = "Lab Notes: Laying the Cluster Scaffold"
 date = "2025-08-11"
 description = "In the first part of this series, I walked through the hardware choices and the initial setup of my Intel-powered homelab. With the machines succesfully doing their best to keep optimal temps this summer, it was time to document the first big step - scaffolding the cluster"
-categories = ["intel lab notes"]
+categories = ["lab notes"]
 tags = ["k3s", "homelab", "storage", "architecture"]
 +++
 
@@ -293,6 +293,7 @@ spec:
       operator: Exists
       effect: NoSchedule
 ```
+
 ---
 
 ### Intel GPU specifics

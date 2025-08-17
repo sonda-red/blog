@@ -226,7 +226,7 @@ Harbor points to the shared services explicitly (values excerpt):
 +     addr: redis.redis:6379
 ```
 
-Full manifests sit under [infrastructure/harbor/](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/harbor). MinIO is the S3 backend Harbor writes to; other apps can use MinIO, Postgres, and Redis via their own DBs/buckets without spawning one‑off stacks.
+Full manifests sit under [infrastructure/harbor/](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/harbor). 
 
 ### k3s specifics
 

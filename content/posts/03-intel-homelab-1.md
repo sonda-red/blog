@@ -1,10 +1,20 @@
 +++
 authors = ["Kalin Daskalov"]
-title = "Building an MLOps Homelab on Intel Hardware – Part 1: Motivation & Setup"
+title = "Lab Notes: Assembling an Intel-Powered Lab"
 date = "2025-05-24"
 description = "This is the first in a technical series documenting the creation of an Intel-only homelab for MLOps and Kubernetes experimentation. In this part: why I’m doing this, and how the setup looks."
+categories = ["lab notes"]
 tags = ["k8s", "mlops", "intel", "homelab", "devops", "gpu", "arc", "a770", "intel-arc", "kubernetes"]
 +++
+
+## Table of Contents
+- [Why Build This Homelab?](#why-build-this-homelab)
+  - [Why Intel-Only?](#why-intel-only)
+  - [Why Two Arc GPUs?](#why-two-arc-gpus)
+  - [The AI Tidal Wave and Decision to Upgrade](#the-ai-tidal-wave-and-decision-to-upgrade)
+  - [Highlights](#highlights)
+  - [What I'm Exploring and What's Next](#what-im-exploring-and-whats-next)
+
 
 ## The Hardware Journey
 

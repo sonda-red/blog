@@ -153,6 +153,11 @@ Below is the map I keep in my head. Central services (Postgres, Redis, MinIO) ar
 
 ![Architecture diagram](/images/post-04/sonda-red-cluster-v3.png)
 
+<a href="/images/post-04/sonda-red-cluster-v3.png" target="_blank">
+  <img src="/images/post-04/sonda-red-cluster-v3.png" alt="Architecture diagram" style="max-width:100%; cursor: zoom-in;">
+</a>
+
+
 ## 08 Component overview
 
 Entry path for the reconciler: [clusters/sonda-red/](https://github.com/sonda-red/cluster-management/tree/main/clusters/sonda-red)

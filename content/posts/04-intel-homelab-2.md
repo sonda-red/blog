@@ -207,7 +207,7 @@ My stack is too simple, intentionally. A full observability is a bit out of my s
 
 ###### Central services
 
-I chose **central** Postgres, **central** Redis, and **central** MinIO as cluster services. Today only Harbor consumes them, but they’re **for the whole cluster**. That keeps state small in number of places and easy to back up. Minio takes the largest chunk of storage from the 2 TB NVMe, as it's intended to be the S3 backend for most apps and I'll try to avoic persistent volumes when I can.
+I chose **central** Postgres, **central** Redis, and **central** MinIO as cluster services. Today only Harbor consumes them, but they’re **for the whole cluster**. That keeps state small in number of places and easy to back up. Minio takes the largest chunk of storage from the 2 TB NVMe, as it's intended to be the S3 backend for most apps and I'll try to avoid persistent volumes when I can.
 
 Harbor points to the shared services explicitly (values excerpt):
 

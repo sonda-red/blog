@@ -20,7 +20,7 @@ In the first part of this series, I walked through the hardware choices and the 
 
 Not too dirty though...
 
-In previous homelab builds I spent weeks on setting up complex home networks, PXE booting, HA experiments with external datastores, etc. An important lesson is that your project needs to have a priority and learning goal, otherwise you can get lost in making the most balanced, perfect, and future-proof setup. So forgive the ignored best practices of some aspects of this setup. The focus is of course running AI workloads on Intel Arc GPUs, I couldn't bring myself to just work on ephemeral `kind` clusters or something like that. So this is a mix of both worlds, not a perfect 3-master HA cluster and all the bells and whistles, but also not a single node cluster running locally.
+In previous homelab builds I spent weeks on setting up complex home networks, PXE booting, HA experiments with external datastores, etc. An important lesson is that your project needs to have a priority and learning goal, otherwise you can get lost in making the most balanced, perfect, and future-proof setup. So forgive the ignored best practices of some aspects of this setup. The focus is of course running AI workloads on Intel Arc GPUs, I couldn't bring myself to just work on ephemeral `kind` clusters or something like that. So this is a mix of both worlds, not a perfect 3-master HA cluster with all the bells and whistles, but also not a single node cluster running locally.
 
 ### Flux and GitOps
 
@@ -39,9 +39,9 @@ But yeah, the biggest time waster was following the logs of the flux helm contro
 
 ## 01 Day 0: k3s no bs
 
-I stripped k3s of the pieces I’d replace anyway — flannel, kube‑proxy, traefik. I love `cilium` because of its alien eBPF magic I don't quite understand, the visibility and the node firewall rules it gives me so that's the CNI, end of story.
+I stripped k3s of the pieces I’d replace anyway — flannel, kube‑proxy, traefik. I love `cilium` because of its alien eBPF magic I don't quite understand, the visibility and the node firewall rules it gives me so that's the CNI, end of story. Everything was run manually with a set of simple scripts. This is one of those compromises I mentioned earlier.
 
-This is literally what I ran on the first control‑plane:
+Control Plane:
 
 ```bash
 curl -sfL https://get.k3s.io | sh -s - server \
@@ -72,6 +72,17 @@ I kept both the NUC and the GPU box as workers and only later differentiated the
 
 ---
 
+## 02 Software updates
+
+---
+
+> Disclaimer: No automation regarding OS package installation or upgrading.
+> * Host packages and kernel updates are just a manual `dnf upgrade` about once a month too - as well as OS upgrades, whenever a new Fedora Release comes out.
+
+[![Node upgrade](/images/post-04/node-upgrade.png)](/images/post-04/node-upgrade.png)
+
+---
+
 ## 03 Storage layout
 
 * **NUC nodes:** single 512 GB disk given entirely to k3s.
@@ -83,11 +94,8 @@ I kept both the NUC and the GPU box as workers and only later differentiated the
 
 On the **GPU node only** I enabled Intel’s oneAPI repo and installed the base bits so containers would see Level Zero and friends. The operator doesn’t install drivers; hosts must be ready beforehand.
 
-> Disclaimer: No automation here yet.
-
-repo file + packages:
-
 ```bash
+# Enable Intel oneAPI repo and install base packages
 sudo tee /etc/yum.repos.d/oneAPI.repo >/dev/null <<'EOF'
 [oneAPI]
 name=Intel oneAPI repository
@@ -317,15 +325,6 @@ Wired Renovate so chart bumps show up as PRs I can merge (or ignore): [renovate.
 ---
 
 ## 09 The bits I kept manual on purpose
-
-* Host packages and kernel updates are just `dnf upgrade` about once a month. I didn’t want to debug day‑0 automation while still changing the shape of the cluster.
-* I used a single node taint to keep junk off the GPU box:
-
-  ```bash
-  kubectl taint nodes sonda-core gpu=only:NoSchedule
-  ```
-
-  Tolerations are added **only** on workloads that deserve the GPU.
 
 ---
 

@@ -151,10 +151,10 @@ Keys are off‑repo. The cluster only knows the age private key needed by Flux t
 
 Below is the map I keep in my head. Central services (Postgres, Redis, MinIO) are shared by design; Harbor is just the first consumer but each later component requiring them will connect to them and not run it's separate service. **Ingress mainly fronts internal UIs** — Harbor, MinIO Console, Grafana, and VictoriaLogs.
 
-![Architecture diagram](/images/post-04/sonda-red-cluster-v3.png)
+[![Architecture diagram](/images/post-04/sonda-red-cluster-v3.png)](/images/post-04/sonda-red-cluster-v3.png)
 
-<a href="/images/post-04/sonda-red-cluster-v3.png" target="_blank">
-  <img src="/images/post-04/sonda-red-cluster-v3.png" alt="Architecture diagram" style="max-width:100%; cursor: zoom-in;">
+<a href="/images/post-04-sonda-red-cluster-v3.png" data-lightbox="gallery">
+  <img src="/images/post-04-sonda-red-cluster-v3.png" alt="Architecture Diagram" style="max-width:300px;" />
 </a>
 
 

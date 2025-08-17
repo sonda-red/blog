@@ -10,11 +10,13 @@ tags = ["k3s", "homelab", "storage", "architecture"]
 
 #
 
-In the first part of this series, I walked through the hardware choices and the initial setup of my Intel-powered homelab. With the machines succesfully doing their best to keep optimal temps this summer, it was time to document the first big step - scaffolding the cluster
+In the first part of this series, I walked through the hardware choices and the initial setup of my Intel-powered homelab. With the machines succesfully doing their best to keep optimal temps this summer, it was time to document the first big step - scaffolding the cluster.
+
 ---
+
 > Some personal notes follow below, if you want to skip them, just scroll down to the next section with the table of contents to get to the detials of the setup.
 
-## Philosophy: Get to Kubernetes fast and dirty, because I want to run some damned AI finally!
+## 00 Philosophy: Get to Kubernetes fast and dirty, because I want to run some damned AI finally!
 
 Not too dirty though...
 
@@ -35,7 +37,7 @@ But yeah, the biggest time waster was following the logs of the flux helm contro
 
 ---
 
-## Day 0: k3s no bs
+## 01 Day 0: k3s no bs
 
 I stripped k3s of the pieces I’d replace anyway — flannel, kube‑proxy, traefik. I love `cilium` because of its alien eBPF magic I don't quite understand, the visibility and the node firewall rules it gives me so that's the CNI, end of story.
 
@@ -70,14 +72,14 @@ I kept both the NUC and the GPU box as workers and only later differentiated the
 
 ---
 
-## Storage layout
+## 03 Storage layout
 
 * **NUC nodes:** single 512 GB disk given entirely to k3s.
 * **GPU node:** 2 TB NVMe for k3s data, 512 GB for the OS, and a separate 2 TB scratch disk for local experiments.
 
 ---
 
-## Intel GPU support: the bare minimum
+## 04 Intel GPU support: the bare minimum
 
 On the **GPU node only** I enabled Intel’s oneAPI repo and installed the base bits so containers would see Level Zero and friends. The operator doesn’t install drivers; hosts must be ready beforehand.
 
@@ -131,26 +133,27 @@ Output should look like this, with the GPU name and properties printed. If you s
 
 ---
 
-## TLS: a local CA for now
+## 05 TLS: a local CA for now
 
 I didn’t want public ACME in the lab. I minted a self‑signed root inside the cluster and used a CA `ClusterIssuer` for leaf certs. Trust is me installing the root CA on my devices, for the flex of having https on my ingress
 
 Manifests were deployed at boostrapping the cluster: [bootstrap/cert-manager/kustomuzation/root-ca.yaml](https://github.com/sonda-red/cluster-management/tree/main/bootstrap/cert-manager/kustomization/root-ca.yaml).
 
-## Secrets: SOPS, encrypted in Git
+## 06 Secrets: SOPS, encrypted in Git
 
-I keep secrets **in the repo** but encrypted with SOPS (age). Flux decrypts at apply time, so I get Git history without leaking credentials. Policy lives at the root: [.sops.yaml](https://github.com/sonda-red/cluster-management/blob/main/.sops.yaml). I encrypt per‑app secrets next to the app manifests.
+I keep secrets **in the repo** but encrypted with SOPS (age). Flux decrypts at apply time, so I get Git history without leaking credentials. Policy lives at the root: [.sops.yaml](https://github.com/sonda-red/cluster-management/blob/main/.sops.yaml). I encrypt per‑app secrets next to the app manifests. In a helm context, Flus uses it's secret generator to decrypt the secrets and pass them to the helm release.
 
 Keys are off‑repo. The cluster only knows the age private key needed by Flux to decrypt.
 
 ---
-## Architecture diagram
+
+## 07 Architecture diagram
 
 Below is the map I keep in my head. Central services (Postgres, Redis, MinIO) are shared by design; Harbor is just the first consumer but each later component requiring them will connect to them and not run it's separate service. **Ingress mainly fronts internal UIs** — Harbor, MinIO Console, Grafana, and VictoriaLogs.
 
-![Architecture diagram](/images/post-04/sonda-red-architecture.png)
+![Architecture diagram](/images/post-04/sonda-red-cluster-v3.png)
 
-## Component overview
+## 08 Component overview
 
 Entry path for the reconciler: [clusters/sonda-red/](https://github.com/sonda-red/cluster-management/tree/main/clusters/sonda-red)
 Reusable bits for Helm releases: [templates/flux/helm-release/](https://github.com/sonda-red/cluster-management/tree/main/templates/flux/helm-release)
@@ -304,7 +307,7 @@ Wired Renovate so chart bumps show up as PRs I can merge (or ignore): [renovate.
 ---
 
 
-## The bits I kept manual on purpose
+## 09 The bits I kept manual on purpose
 
 * Host packages and kernel updates are just `dnf upgrade` about once a month. I didn’t want to debug day‑0 automation while still changing the shape of the cluster.
 * I used a single node taint to keep junk off the GPU box:

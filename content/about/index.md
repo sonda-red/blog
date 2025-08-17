@@ -1,7 +1,5 @@
 # About
 
-I'm Kalin Daskalov — a DevOps and Platform Engineer from Sofia, Bulgaria. Focused on scalable infrastructure, Kubernetes, and cloud-native tooling. I currently work at SAP, where I build secure, production-grade systems that support enterprise-scale workloads.
+I'm Kalin Daskalov — a DevOps Engineer focused on Kubernetes and cloud-native infrastructure, with experience across both startup and enterprise environments. At work, I'm gradually building skills in Go-based operator development and SPIFFE/SPIRE for workload identity and security. Outside of work, I'm exploring MLOps and AI—particularly how to optimize LLM training and inference on Kubernetes. Most of that exploration is documented here.
 
-Before tech, I came from a very different world — bookbinding and high craft. That hands-on, detail-oriented mindset still drives how I approach engineering: with patience, precision, and a builder’s mentality.
-
-Through Sonda.red, I share my journey as I go deeper into MLOps, GPU workloads, and system-level experimentation, all powered by my Intel-based homelab. This is where I think in public—documenting the process.
+Before tech, I came from a very different world — bookbinding and high craft. My hobby was customizing linux distros since I was 15 and ironically it became my career but at scale.

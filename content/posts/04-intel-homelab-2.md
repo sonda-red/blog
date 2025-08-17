@@ -131,13 +131,14 @@ Installing the `intel-basekit`, `intel-level-zero` and the `SYCL` packages will 
 This support is later extended in kubernetes with the `intel-device-operator` and `intel-device-plugins-gpu` to expose the GPUs to the cluster, which you can follow in the next section at [Intel GPU specifics on k8s level](#intel-gpu-specifics).
 
 * Sanity Test:
-To make sure everything is working at this stage, I usually go through [the process of pulling an ipex image](https://pytorch-extension.intel.com/installation?platform=gpu&version=v2.5.10%2Bxpu&os=linux%2Fwsl2&package=docker_), which stands for [intel-extension-for-pytorch](https://github.com/intel/intel-extension-for-pytorch).
+To make sure everything is working at this stage, I usually go through [the process of pulling an ipex image](https://pytorch-extension.intel.com/installation?platform=gpu&version=v2.7.10%2Bxpu&os=linux%2Fwsl2&package=docker), which stands for [intel-extension-for-pytorch](https://github.com/intel/intel-extension-for-pytorch).
+
 
 > You can run a simple sanity test to double confirm if the correct version is installed, and if the software stack can get correct hardware information onboard your system. The command should return PyTorch* and Intel® Extension for PyTorch* versions installed, as well as GPU card(s) information detected.
 
 ```bash
 # Pull the image and run a simple test to check if the Intel Extension for PyTorch is working correctly
-docker pull intel/intel-extension-for-pytorch:2.5.10-xpu
+docker pull intel/intel-extension-for-pytorch:2.7.10-xpu
 # Run the test in the container while giving it access to the GPU devices and render group
 docker run --rm -it --device /dev/dri --group-add render intel/intel-extension-for-pytorch:2.7.10-xpu \
   python -c "import torch; import intel_extension_for_pytorch as ipex; print(torch.__version__); print(ipex.__version__); [print(f'[{i}]: {torch.xpu.get_device_properties(i)}') for i in range(torch.xpu.device_count())];"  
@@ -335,7 +336,7 @@ I0817 13:01:13.629689       1 gpu_plugin.go:92] Select nonePolicy for GPU device
 I0817 13:01:13.629703       1 gpu_plugin.go:138] Allocate deviceIds: ["card0-0"]
 
 ```
-This log shows the Intel GPU plugin found the two Arc GPUs, registered it with the kubelet, and now pods can request it by adding resources.requests: { gpu.intel.com/i915: 1 }. The monitoring resource is also available if you deploy the sidecar/telemetry components.
+This log shows the Intel GPU plugin found the two Arc GPUs, registered it with the kubelet, and now pods can request it by adding `resources.requests: { gpu.intel.com/i915: 1 }`. The monitoring resource is also available if you deploy the sidecar/telemetry components.
 
 ### Component updates
 

@@ -1,18 +1,19 @@
 +++
 authors = ["Kalin Daskalov"]
-title = "Intel Lab Notes: Laying the Cluster Scaffold"
+title = "Lab Notes: Laying the Cluster Scaffold"
 date = "2025-08-11"
-description = "In the first part of this series, I walked through the hardware choices and the initial setup of my Intel-powered homelab. With the machines humming away, it was time to tackle the real challenge: building a Kubernetes cluster that’s not just functional, but maintainable and future-proof."
+description = "In the first part of this series, I walked through the hardware choices and the initial setup of my Intel-powered homelab. With the machines succesfully doing their best to keep optimal temps this summer, it was time to document the first big step - scaffolding the cluster"
 categories = ["intel lab notes"]
 tags = ["k3s", "homelab", "storage", "architecture"]
 +++
 
 
-# Lab Notes: Bootstrapping k3s — my fast, imperfect path
+#
 
-In the first part of this series, I walked through the hardware choices and the initial setup of my Intel-powered homelab. With the machines humming away, it was time to tackle the real challenge: building a Kubernetes cluster that’s not just functional, but maintainable and future-proof.
+In the first part of this series, I walked through the hardware choices and the initial setup of my Intel-powered homelab. With the machines succesfully doing their best to keep optimal temps this summer, it was time to document the first big step - scaffolding the cluster
 ---
 > Some personal notes follow below, if you want to skip them, just scroll down to the next section with the table of contents to get to the detials of the setup.
+
 ## Philosophy: Get to Kubernetes fast and dirty, because I want to run some damned AI finally!
 
 Not too dirty though...
@@ -31,12 +32,6 @@ And in the first one we were just getting things done with k8s and having fun wi
 Hopefully this cluster won't grow to the extent that I have to deal with that :)
 
 But yeah, the biggest time waster was following the logs of the flux helm controller, trying to figure out why it didn't apply the changes I made, redoing the changes, manually reconciling, etc. Dealing with all the different ways the helm charts of the tools organize their values and making me wonder why is still use them and not the raw manifests but giving into the temptation nonetheless. Also using the Flux configMap and secret generators and integrating them with SOPS was a bit of a pain. However when all the pieces fell into place and made a sound template, it was just a matter of replicating the same pattern for the rest of the cluster components.
-
-## The constraint
-
-I wanted Kubernetes up **now**, not after a month of yak‑shaving. I also wanted recent kernels for Intel Arc. That pushed me to **Fedora Server 42** on bare metal, manually installed on each box. No PXE, no golden images. Just `dnf upgrade` and go.
-
-> Tradeoff I accepted: more hands‑on host maintenance early, less ceremony between me and a working cluster.
 
 ---
 
@@ -86,7 +81,7 @@ I kept both the NUC and the GPU box as workers and only later differentiated the
 
 On the **GPU node only** I enabled Intel’s oneAPI repo and installed the base bits so containers would see Level Zero and friends. The operator doesn’t install drivers; hosts must be ready beforehand.
 
-> Disclaimer: No automation here yet. I did this manually, but it’s a one‑time setup. I’ll automate it later.
+> Disclaimer: No automation here yet.
 
 repo file + packages:
 
@@ -103,16 +98,36 @@ EOF
 sudo dnf -y install intel-basekit intel-oneapi-runtime-libs
 ```
 
-Sanity checks I  ran:
-
-```bash
-lsmod | grep -E 'i915|xe' || true
-ls -l /dev/dri
-```
-
 Installing the `intel-basekit`, `intel-level-zero` and the `SYCL` packages will lead a system that supports the Intel Arc GPUs and the Level Zero API.
 
-This support is later extended in kubernetes with the `intel-device-operator` and `intel-device-plugins-gpu` to expose the GPUs to the cluster, which you can follow in the next section.
+This support is later extended in kubernetes with the `intel-device-operator` and `intel-device-plugins-gpu` to expose the GPUs to the cluster, which you can follow in the next section at [Intel GPU specifics on k8s level](#intel-gpu-specifics).
+
+* Sanity Test:
+To make sure everything is working at this stage, I usually go through [the process of pulling an ipex image](https://pytorch-extension.intel.com/installation?platform=gpu&version=v2.5.10%2Bxpu&os=linux%2Fwsl2&package=docker_), which stands for [intel-extension-for-pytorch](https://github.com/intel/intel-extension-for-pytorch).
+
+> You can run a simple sanity test to double confirm if the correct version is installed, and if the software stack can get correct hardware information onboard your system. The command should return PyTorch* and Intel® Extension for PyTorch* versions installed, as well as GPU card(s) information detected.
+
+```bash
+# Pull the image and run a simple test to check if the Intel Extension for PyTorch is working correctly
+docker pull intel/intel-extension-for-pytorch:2.5.10-xpu
+# Run the test in the container while giving it access to the GPU devices and render group
+docker run --rm -it --device /dev/dri --group-add render intel/intel-extension-for-pytorch:2.7.10-xpu \
+  python -c "import torch; import intel_extension_for_pytorch as ipex; print(torch.__version__); print(ipex.__version__); [print(f'[{i}]: {torch.xpu.get_device_properties(i)}') for i in range(torch.xpu.device_count())];"  
+
+[W817 18:49:52.781169416 OperatorEntry.cpp:154] Warning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: aten::geometric_(Tensor(a!) self, float p, *, Generator? generator=None) -> Tensor(a!)
+    registered at /pytorch/build/aten/src/ATen/RegisterSchema.cpp:6
+  dispatch key: XPU
+  previous kernel: registered at /pytorch/aten/src/ATen/VmapModeRegistrations.cpp:37
+       new kernel: registered at /build/intel-pytorch-extension/build/Release/csrc/gpu/csrc/gpu/xpu/ATen/RegisterXPU_0.cpp:186 (function operator())
+2.7.0+xpu
+2.7.10+xpu
+[0]: _XpuDeviceProperties(name='Intel(R) Arc(TM) A770 Graphics', platform_name='Intel(R) oneAPI Unified Runtime over Level-Zero', type='gpu', driver_version='1.6.32567+18', total_memory=15473MB, max_compute_units=512, gpu_eu_count=512, gpu_subslice_count=32, max_work_group_size=1024, max_num_sub_groups=128, sub_group_sizes=[8 16 32], has_fp16=1, has_fp64=0, has_atomic64=1)
+[1]: _XpuDeviceProperties(name='Intel(R) Arc(TM) A770 Graphics', platform_name='Intel(R) oneAPI Unified Runtime over Level-Zero', type='gpu', driver_version='1.6.32567+18', total_memory=15473MB, max_compute_units=512, gpu_eu_count=512, gpu_subslice_count=32, max_work_group_size=1024, max_num_sub_groups=128, sub_group_sizes=[8 16 32], has_fp16=1, has_fp64=0, has_atomic64=1)
+```
+
+Output should look like this, with the GPU name and properties printed. If you see the GPU name and properties, you can be sure that the Intel Extension for PyTorch is working correctly and can access the GPU devices, otherwise you'll receive something of the likes of XPU device not found or similar.
 
 ---
 
@@ -133,70 +148,7 @@ Keys are off‑repo. The cluster only knows the age private key needed by Flux t
 
 Below is the map I keep in my head. Central services (Postgres, Redis, MinIO) are shared by design; Harbor is just the first consumer but each later component requiring them will connect to them and not run it's separate service. **Ingress mainly fronts internal UIs** — Harbor, MinIO Console, Grafana, and VictoriaLogs.
 
-```mermaid
-flowchart LR
-  subgraph GitOps["GitOps & Secrets"]
-    repo["GitHub: sonda-red/cluster-management"]
-    flux["Flux (reconciler)"]
-    sops["SOPS (age)"]
-    repo --> flux
-    sops -.decrypt at apply.-> flux
-  end
-
-  subgraph Cluster["k3s Cluster"]
-    cp["k3s server (sonda-01)"]
-    w1["sonda-02 (NUC worker)"]
-    w2["sonda-core (GPU worker, Arc)"]
-    cilium["Cilium (kube-proxy replacement)"]
-    cilium --- cp
-    cilium --- w1
-    cilium --- w2
-  end
-
-  subgraph Net["Networking & Ingress"]
-    metallb["MetalLB"]
-    ingress["ingress-nginx (UI entrypoint)"]
-    cert["cert-manager (local CA)"]
-    metallb --> ingress
-    cert --> ingress
-  end
-
-  subgraph Platform["Platform services (central)"]
-    pg(("Postgres"))
-    rds(("Redis"))
-    s3(("MinIO (S3)"))
-    harbor["Harbor"]
-    harbor --> pg
-    harbor --> rds
-    harbor --> s3
-  end
-
-  subgraph GPU["GPU & Node Features"]
-    intelop["Intel Device Plugins Operator"]
-    gpucr["GpuDevicePlugin (CR)"]
-    gpures["gpu.intel.com/*"]
-    nfd["Node Feature Discovery"]
-    intelop --> gpucr --> gpures
-    nfd -.labels.-> w2
-  end
-
-  subgraph Obs["Observability"]
-    kps["kube-prometheus-stack"]
-    grafana["Grafana"]
-    vlogs["VictoriaLogs"]
-    grafana -.part of.-> kps
-  end
-
-  user((User)) -->|HTTPS| ingress
-  ingress --> harbor
-  ingress --> s3
-  ingress --> grafana
-  ingress --> vlogs
-
-  kps -.scrape.-> cp
-  kps -.scrape.-> w1
-  kps -.scrape.-> w2
-```
+![Architecture diagram](/images/post-04/sonda-red-architecture.png)
 
 ## Component overview
 

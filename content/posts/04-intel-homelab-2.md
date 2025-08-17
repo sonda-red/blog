@@ -232,7 +232,7 @@ Full manifests sit under [infrastructure/harbor/](https://github.com/sonda-red/c
 
 * **Upgrades:** System Upgrade Controller → [flux-system/system-upgrade-controller.yaml](https://github.com/sonda-red/cluster-management/blob/main/clusters/sonda-red/flux-system/system-upgrade-controller.yaml)
 
- k3s has system upgrade controller, which is not built in but seperately installed. It consists of an operator and a controller that watches for `Plan` resources and applies them to the nodes. The nodes are adequately drained, cordoned and upgraded. I use it to upgrade the k3s version from within the cluster, so I can just change the version in the `Plan` and it will apply it to all nodes, without having to run k3s scripts on the nodes manually.
+ k3s has a [system-upgrade-controller](https://github.com/rancher/system-upgrade-controller), which is not built in but seperately installed. It consists of an operator and a controller that watches for `Plan` resources and applies them to the nodes. The nodes are adequately drained, cordoned and upgraded. I use it to upgrade the k3s version from within the cluster, so I can just change the version in the `Plan` and it will apply it to all nodes, without having to run k3s scripts on the nodes manually.
 
  An upgrade `Plan` looks like this:
 

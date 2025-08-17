@@ -8,13 +8,31 @@ tags = ["k3s", "homelab", "storage", "architecture"]
 +++
 
 
-#
+## Table of Contents
+- [Table of Contents](#table-of-contents)
+- [00 Philosophy: Get to Kubernetes fast and dirty, because I want to run some damned AI finally!](#00-philosophy-get-to-kubernetes-fast-and-dirty-because-i-want-to-run-some-damned-ai-finally)
+  - [Flux and GitOps](#flux-and-gitops)
+- [01 Day 0: k3s no bs](#01-day-0-k3s-no-bs)
+- [02 Software updates](#02-software-updates)
+- [03 Storage layout](#03-storage-layout)
+- [04 Intel GPU support: the bare minimum](#04-intel-gpu-support-the-bare-minimum)
+- [05 TLS: a local CA for now](#05-tls-a-local-ca-for-now)
+- [06 Secrets: SOPS, encrypted in Git](#06-secrets-sops-encrypted-in-git)
+- [07 Architecture diagram](#07-architecture-diagram)
+- [08 Component overview](#08-component-overview)
+  - [More or less self-explanatory infrastructure components:](#more-or-less-self-explanatory-infrastructure-components)
+        - [Central services](#central-services)
+  - [k3s specifics](#k3s-specifics)
+  - [Intel GPU specifics](#intel-gpu-specifics)
+  - [Component updates](#component-updates)
+- [09 To-do and next steps](#09-to-do-and-next-steps)
+
 
 In the first part of this series, I walked through the hardware choices and the initial setup of my Intel-powered homelab. With the machines succesfully doing their best to keep optimal temps this summer, it was time to document the first big step - scaffolding the cluster.
 
 ---
 
-> Some personal notes follow below, if you want to skip them, just scroll down to the next section with the table of contents to get to the detials of the setup.
+> Some personal notes follow below, if you want to skip them, just scroll down to the next section or up to the table of contents to get to wherever you want to go.
 
 ## 00 Philosophy: Get to Kubernetes fast and dirty, because I want to run some damned AI finally!
 
@@ -324,36 +342,20 @@ Wired Renovate so chart bumps show up as PRs I can merge (or ignore): [renovate.
 
 ---
 
-## 09 The bits I kept manual on purpose
+## 09 To-do and next steps
+
+- [ ] Add bootstrap helmfile deployments to be managed by Flux
+- [ ] Research and add Flux dashboards as quality of life improvement
+- [ ] Begin building some containers with the `arc` runners and push them to Harbor
+
+Hopefully, this is where the fun begins. I want to experiment a bit with scheduling and running different kinds of workloads. No real solid plan for the next article but I have a few ideas:
+
+- Stable Diffusion
+- LLMs and different inference engines like vllm, llama.cpp, etc.
+- Explore model and prompt versioning
+- Observability of Intel GPUs and their utilization
+- Benchmarking and comparing different inference engines?
+- Loading bigger models on both GPUs 
 
 ---
 
-## What I’d change if I did it again
-
-* Move Cilium and cert‑manager fully under Flux on day 1. The repo already has the scaffolding; it’s just a matter of trusting it earlier.
-* Turn on the Level Zero exporter and scrape GPU metrics alongside node metrics.
-* Add cosign to sign my own images and enforce it in the registry.
-* Tighten MinIO and Harbor with isolated creds and bucket policies.
-
----
-
-## How I know it works
-
-My quick checks:
-
-```bash
-# Cilium ready
-kubectl -n kube-system get pods -l k8s-app=cilium
-
-# GPU resources visible
-kubectl get nodes -o=jsonpath="{range .items[*]}{.metadata.name}{': '}{.status.allocatable.gpu\.intel\.com/i915}{'\n'}"
-
-# cert-manager healthy
-kubectl -n cert-manager get pods
-```
-
-If the demo pod prints OpenCL info and exits, the path is good.
-
----
-
-This isn’t the “right way.” It’s my way that week — fast, slightly messy, and honest. The repo is the source of truth for the manifests; this page is the reasoning behind them.

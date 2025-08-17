@@ -103,4 +103,4 @@ For about 6 months, I’ve been running this Intel-only homelab as a local works
 
 I’m now ready to take it to the next level by integrating it into my Kubernetes cluster and exploring Intel’s GPU support in Kubernetes. In the next part of this series, I'll document the architecture of the cluster itself, the reasons behind the choices I made, tech stack, etc.
 
-> Link to Part 2: [Laying the Cluster Scaffold](https://blog.sonda.red/posts/04-intel-homelab-2/)
+> Link to Part 2: [Laying the Cluster Foundation](https://blog.sonda.red/posts/04-intel-homelab-2/)

@@ -1,6 +1,6 @@
 +++
 authors = ["Kalin Daskalov"]
-title = "Lab Notes: Laying the Cluster Scaffold"
+title = "Lab Notes: Laying the Cluster Foundation"
 date = "2025-08-11"
 description = "In the first part of this series, I walked through the hardware choices and the initial setup of my Intel-powered homelab. With the machines succesfully doing their best to keep optimal temps this summer, it was time to document the first big step - scaffolding the cluster"
 categories = ["lab notes"]
@@ -29,7 +29,7 @@ tags = ["k3s", "homelab", "storage", "architecture"]
 - [09 To-do and next steps](#09-to-do-and-next-steps)
 
 
-In the first part of this series, I walked through the hardware choices and the initial setup of my Intel-powered homelab. With the machines succesfully doing their best to keep optimal temps this summer, it was time to document the first big step - scaffolding the cluster.
+In the first part of this series, I walked through the hardware choices and the initial setup of my Intel-powered homelab. With the machines succesfully doing their best to keep optimal temps this summer, it was time to document the first big step - building up the cluster.
 
 ---
 

@@ -140,8 +140,8 @@ To make sure everything is working at this stage, I usually go through [the proc
 ```bash
 # Pull the image and run a simple test to check if the Intel Extension for PyTorch is working correctly
 docker pull intel/intel-extension-for-pytorch:2.7.10-xpu
-# Run the test in the container while giving it access to the GPU devices and render group
-docker run --rm -it --device /dev/dri --group-add render intel/intel-extension-for-pytorch:2.7.10-xpu \
+# Run the test in the container while giving it access to the GPU devices
+docker run --rm -it --device /dev/dri intel/intel-extension-for-pytorch:2.7.10-xpu \
   python -c "import torch; import intel_extension_for_pytorch as ipex; print(torch.__version__); print(ipex.__version__); [print(f'[{i}]: {torch.xpu.get_device_properties(i)}') for i in range(torch.xpu.device_count())];"  
 
 [W817 18:49:52.781169416 OperatorEntry.cpp:154] Warning: Warning only once for all operators,  other operators may also be overridden.
@@ -157,7 +157,7 @@ docker run --rm -it --device /dev/dri --group-add render intel/intel-extension-f
 [1]: _XpuDeviceProperties(name='Intel(R) Arc(TM) A770 Graphics', platform_name='Intel(R) oneAPI Unified Runtime over Level-Zero', type='gpu', driver_version='1.6.32567+18', total_memory=15473MB, max_compute_units=512, gpu_eu_count=512, gpu_subslice_count=32, max_work_group_size=1024, max_num_sub_groups=128, sub_group_sizes=[8 16 32], has_fp16=1, has_fp64=0, has_atomic64=1)
 ```
 
-Output should look like this, with the GPU name and properties printed. If you see the GPU name and properties, you can be sure that the Intel Extension for PyTorch is working correctly and can access the GPU devices, otherwise you'll receive something of the likes of XPU device not found or similar.
+Output should look like this, with the GPU name and properties printed. Congrats, you can be sure that the Intel Extension for PyTorch is working correctly and can access the GPU devices, otherwise you'll receive something of the likes of XPU device not found or similar.
 
 ---
 
@@ -350,6 +350,7 @@ Wired Renovate so chart bumps show up as PRs I can merge (or ignore): [renovate.
 - [ ] Add bootstrap helmfile deployments to be managed by Flux
 - [ ] Research and add Flux dashboards as quality of life improvement
 - [ ] Begin building some containers with the `arc` runners and push them to Harbor
+- [ ] VPN or some kind of public endpoint for remote access to the cluster
 
 Hopefully, this is where the fun begins. I want to experiment a bit with scheduling and running different kinds of workloads. No real solid plan for the next article but I have a few ideas:
 

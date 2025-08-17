@@ -153,11 +153,6 @@ Below is the map I keep in my head. Central services (Postgres, Redis, MinIO) ar
 
 [![Architecture diagram](/images/post-04/sonda-red-cluster-v3.png)](/images/post-04/sonda-red-cluster-v3.png)
 
-<a href="/images/post-04-sonda-red-cluster-v3.png" data-lightbox="gallery">
-  <img src="/images/post-04-sonda-red-cluster-v3.png" alt="Architecture Diagram" style="max-width:300px;" />
-</a>
-
-
 ## 08 Component overview
 
 Entry path for the reconciler: [clusters/sonda-red/](https://github.com/sonda-red/cluster-management/tree/main/clusters/sonda-red)
@@ -167,12 +162,20 @@ Reusable bits for Helm releases: [templates/flux/helm-release/](https://github.c
 
 * **Object storage:** MinIO → [infrastructure/minio/](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/minio)
 * **Registry:** Harbor (on Postgres + Redis) → [infrastructure/harbor/](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/harbor)
-* **Datastores:** Postgres → [infrastructure/postgres/](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/postgres), Redis → [infrastructure/redis/](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/redis)
-* **Ingress:** ingress‑nginx → [infrastructure/ingress-nginx/](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/ingress-nginx)
+* **Datastores:** Postgres → [infrastructure/postgresql/](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/postgresql), Redis → [infrastructure/redis/](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/redis)
+* **Ingress:** ingress‑nginx → [bootstrap/infra/ingress-nginx/](https://github.com/sonda-red/cluster-management/tree/main/bootstrap/infra/ingress-nginx)
 * **LB:** MetalLB → [infrastructure/metallb/](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/metallb)
-* **Metrics & dashboards:** kube‑prometheus‑stack → [infrastructure/kube-prometheus-stack/](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/kube-prometheus-stack)
-* **Logs:** VictoriaLogs → [infrastructure/victoria-logs/](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/victoria-logs)
+* **Metrics & dashboards:** kube‑prometheus‑stack → [infrastructure/monitoring/kube-prometheus-stack/](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/monitoring/kube-prometheus-stack)
+* **Logs:** VictoriaLogs → [infrastructure/monitoring/victorialogs/](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/monitoring/victorialogs)
 * **CI runners:** Actions Runner Controller → [infrastructure/arc/](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/arc)
+
+> A note on observability:
+
+My stack is too simple, intentionally. A full observability is a bit out of my scope, especially setting up alerting, etc. I have the basics down, as well as the default dashboards in grafana but I mainly stay in `Lens` to follow logs or deployment status, while I'm working on the cluster.
+
+| Lens Workload Overview | Master Node Status View |
+|:--------------:|:-------------:|
+| [![Lens Workload Overview](/images/post-04/lens.png)](/images/post-04/lens.png) | [![Master Node Status View](/images/post-04/grafana.png)](/images/post-04/grafana.png) |
 
 ###### Central services
 
@@ -264,9 +267,10 @@ spec:
       operator: Exists
       effect: NoSchedule
 ```
-
+---
 
 ### Intel GPU specifics
+
 * **Node inventory:** Node Feature Discovery → [infrastructure/nfd/](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/nfd)
 It detects the presence of Intel GPUs and labels them accordingly. GPU plugin’s node selector is used to deploy plugin to nodes which have such a GPU label.
 * **Intel Device Operator:** Intel Device Operator → [infrastructure/intel-device-operator/](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/intel-device-operator)
@@ -309,8 +313,8 @@ This log shows the Intel GPU plugin found the two Arc GPUs, registered it with t
 ### Component updates
 
 Wired Renovate so chart bumps show up as PRs I can merge (or ignore): [renovate.json](https://github.com/sonda-red/cluster-management/blob/main/renovate.json)
----
 
+---
 
 ## 09 The bits I kept manual on purpose
 

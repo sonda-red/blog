@@ -24,7 +24,7 @@ Later, I added five **Dell Wyse 3040** thin clients to build a Raspberry Pi-styl
 
 | NUC 8i3BEH in Akasa case | NUC/Dell Wyse cluster | Double NUC setup |
 |:------------------------:|:---------------------:|:----------------:|
-| ![NUC 8i3BEH in Akasa case](/images/post-03/nuc-open.jpg) | ![NUC/Dell Wyse cluster](/images/post-03/3dell-1nuc.jpg) | ![NUC 8i3BEH in Akasa case](/images/post-03/2nuc.jpg) |
+| [![NUC 8i3BEH in Akasa case](/images/post-03/nuc-open.jpg)](/images/post-03/nuc-open.jpg) | [![NUC/Dell Wyse cluster](/images/post-03/3dell-1nuc.jpg)](/images/post-03/3dell-1nuc.jpg) | [![Double NUC setup](/images/post-03/2nuc.jpg)](/images/post-03/2nuc.jpg) |
 
 ---
 
@@ -93,7 +93,7 @@ _Inspired by this article: [Fractal Design North Case with maxxed out air coolin
 
 | Case internals | Workspace view |
 |:--------------:|:-------------:|
-| ![Case internals](/images/post-03/arc-front.jpeg) | ![Workspace view](/images/post-03/desk.png) |
+| [![Case internals](/images/post-03/arc-front.jpeg)](/images/post-03/arc-front.jpeg) | [![Workspace view](/images/post-03/desk.png)](/images/post-03/desk.png) |
 
 ---
 
@@ -102,3 +102,5 @@ _Inspired by this article: [Fractal Design North Case with maxxed out air coolin
 For about 6 months, I’ve been running this Intel-only homelab as a local workstation. I've been getting used to which drivers on which kernel or distribution work best, and how to set up the GPUs for optimal performance. I’ve also been experimenting with running LLMs and image generation models locally, testing multi-GPU orchestration and containerization of these workloads.
 
 I’m now ready to take it to the next level by integrating it into my Kubernetes cluster and exploring Intel’s GPU support in Kubernetes. In the next part of this series, I'll document the architecture of the cluster itself, the reasons behind the choices I made, tech stack, etc.
+
+> Link to Part 2: [Laying the Cluster Scaffold](https://blog.sonda.red/posts/04-intel-homelab-2/)

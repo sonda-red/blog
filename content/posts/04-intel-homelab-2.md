@@ -165,7 +165,7 @@ Output should look like this, with the GPU name and properties printed. Congrats
 
 I didn’t want public ACME in the lab. I minted a self‑signed root inside the cluster and used a CA `ClusterIssuer` for leaf certs. Trust is me installing the root CA on my devices, for the flex of having https on my ingress
 
-Manifests were deployed at boostrapping the cluster: [bootstrap/cert-manager/kustomuzation/root-ca.yaml](https://github.com/sonda-red/cluster-management/tree/main/bootstrap/cert-manager/kustomization/root-ca.yaml).
+Manifests were deployed at boostrapping the cluster: [bootstrap/infra/cert-manager/kustomization/root-ca.yaml](https://github.com/sonda-red/cluster-management/tree/main/bootstrap/infra/cert-manager/kustomization/root-ca.yaml).
 
 ## 06 Secrets: SOPS, encrypted in Git
 

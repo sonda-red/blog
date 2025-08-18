@@ -2,12 +2,14 @@
 authors = ["Kalin Daskalov"]
 title = "Lab Notes: Laying the Cluster Foundation"
 date = "2025-08-11"
-description = "In the first part of this series, I walked through the hardware choices and the initial setup of my Intel-powered homelab. With the machines succesfully doing their best to keep optimal temps this summer, it was time to document the first big step - scaffolding the cluster"
+description = "In the first part of this series, I walked through the hardware choices and the initial setup of my Intel-powered homelab. With the machines successfully doing their best to keep optimal temps this summer, it was time to document the first big step - scaffolding the cluster"
 categories = ["lab notes"]
 tags = ["k8s", "mlops", "intel", "homelab", "devops", "gpu", "arc", "a770", "intel-arc", "kubernetes", "k3s"]
 +++
 
 > Link to Part 1: [Assembling an Intel-Powered Lab](https://blog.sonda.red/posts/03-intel-homelab-1/)
+
+> Disclaimer: This is not production guidance and it is not sponsored. It documents what actually ran in my homelab with Arc GPUs and k3s, so please double check before you roll it into your own setup.
 
 ## Table of Contents
 - [Table of Contents](#table-of-contents)
@@ -29,7 +31,7 @@ tags = ["k8s", "mlops", "intel", "homelab", "devops", "gpu", "arc", "a770", "int
 - [09 To-do and next steps](#09-to-do-and-next-steps)
 
 
-In the first part of this series, I walked through the hardware choices and the initial setup of my Intel-powered homelab. With the machines succesfully doing their best to keep optimal temps this summer, it was time to document the first big step - building up the cluster.
+In the first part of this series, I walked through the hardware choices and the initial setup of my Intel-powered homelab. With the machines successfully doing their best to keep optimal temps this summer, it was time to document the first big step - building up the cluster.
 
 ---
 
@@ -39,20 +41,18 @@ In the first part of this series, I walked through the hardware choices and the 
 
 Not too dirty though...
 
-In previous homelab builds I spent weeks on setting up complex home networks, PXE booting, HA experiments with external datastores, etc. An important lesson is that your project needs to have a priority and learning goal, otherwise you can get lost in making the most balanced, perfect, and future-proof setup. So forgive the ignored best practices of some aspects of this setup. The focus is of course running AI workloads on Intel Arc GPUs, I couldn't bring myself to just work on ephemeral `kind` clusters or something like that. So this is a mix of both worlds, not a perfect 3-master HA cluster with all the bells and whistles, but also not a single node cluster running locally.
+In previous homelab builds I spent weeks on setting up complex home networks, PXE booting, HA experiments with external datastores, etc. An important lesson is that your project needs to have a priority and learning goal, otherwise you can get lost in making the most balanced, perfect, and future-proof setup. So forgive the ignored best practices of some aspects of this setup. The focus is of course running AI workloads on Intel Arc GPUs, For now, I avoided using an ephemeral cluster I bring up and destroy locally, like `kind` but that may change. So this is a mix of both worlds, not a perfect 3-master HA cluster with all the bells and whistles, but also not cluster running locally.
 
 ### Flux and GitOps
 
-My last post was about two months ago when I had the hardware ready and I was ready to start tinkering with it. It doesn't look like much progress but this is after hours with the kids, work, and other things. The fun and time consuming stuff was learning and utilizing `Flux`.
-
-I've used `helmfile` with a pipeline setup in `Gitlab` for my previous homelab and use `ArgoCD` at work. Flux is a bit different but I like it for its pure GitOps approach. I'm a bit tired of clicking, to be honest. I don't want to click around in a UI, or follow pipelines along. I want to commit like a mad man and after a while have my changes propagated to the cluster. In theory, ArgoCD can do that too but there's something about the way you write the argo manifests that doesn't feel as clean as Flux. Don't treat this as a valid technical argument, it's just a personal preference. I also had a fun talk with a colleague once about the differences and this was his take:
+I've used `helmfile` with a pipeline setup in `Gitlab` for my previous homelab and use `ArgoCD` at work. `Flux` is a bit different but I like it for its pure GitOps approach. I'm a bit tired of clicking, to be honest. I don't want to click around in a UI, or follow pipelines along. I want to commit like a mad man and after a while have my changes propagated to the cluster. In theory, ArgoCD can do that too but there's something about the way you write the argo manifests that doesn't feel as clean as Flux. Don't treat this as a valid technical argument, it's just a personal preference. I also had a fun talk with a colleague once about the differences and this was his take:
 
 > I've been working in 3 companies in a row, first one was using helmfile, second - argo, and third - flux
-And in the first one we were just getting things done with k8s and having fun with other tasks, like we were working on a open source project, or trying compicated setups and different tools. But in the rest we were mostly trying to make GitOps work, re-writing manifests because of yaml typos, reviewing something like 700 lines of yaml code, merging, fixing, and trying to make GitOps work again. 
+And in the first one we were just getting things done with k8s and having fun with other tasks, like we were working on an open source project, or trying complicated setups and different tools. But in the rest we were mostly trying to make GitOps work, re-writing manifests because of YAML typos, reviewing something like 700 lines of YAML code, merging, fixing, and trying to make GitOps work again. 
 
 Hopefully this cluster won't grow to the extent that I have to deal with that :)
 
-But yeah, the biggest time waster was following the logs of the flux helm controller, trying to figure out why it didn't apply the changes I made, redoing the changes, manually reconciling, etc. Dealing with all the different ways the helm charts of the tools organize their values and making me wonder why is still use them and not the raw manifests but giving into the temptation nonetheless. Also using the Flux configMap and secret generators and integrating them with SOPS was a bit of a pain. However when all the pieces fell into place and made a sound template, it was just a matter of replicating the same pattern for the rest of the cluster components.
+But yeah, the biggest time waster was following the logs of the Flux helm controller, trying to figure out why it didn't apply the changes I made, redoing the changes, manually reconciling, etc. Dealing with all the different ways the helm charts of the tools organize their values is one of the reasons I'm becoming skeptical of helm recently. Also, using the Flux configMap and secret generators and integrating them with SOPS was a bit of a pain. However, when all the pieces fell into place and made a sound template, it was just a matter of replicating the same pattern for the rest of the cluster components.
 
 ---
 
@@ -127,9 +127,9 @@ EOF
 sudo dnf -y install intel-basekit intel-oneapi-runtime-libs
 ```
 
-Installing the `intel-basekit`, `intel-level-zero` and the `SYCL` packages will lead a system that supports the Intel Arc GPUs and the Level Zero API.
+Installing the `intel-basekit`, `intel-level-zero` and the `SYCL` packages will result in a system that supports the Intel Arc GPUs and the Level Zero API.
 
-This support is later extended in kubernetes with the `intel-device-operator` and `intel-device-plugins-gpu` to expose the GPUs to the cluster, which you can follow in the next section at [Intel GPU specifics on k8s level](#intel-gpu-specifics).
+This support is later extended in Kubernetes with the `intel-device-operator` and `intel-device-plugins-gpu` to expose the GPUs to the cluster, which you can follow in the next section at [Intel GPU specifics on k8s level](#intel-gpu-specifics).
 
 * Sanity Test:
 To make sure everything is working at this stage, I usually go through [the process of pulling an ipex image](https://pytorch-extension.intel.com/installation?platform=gpu&version=v2.7.10%2Bxpu&os=linux%2Fwsl2&package=docker), which stands for [intel-extension-for-pytorch](https://github.com/intel/intel-extension-for-pytorch).
@@ -169,7 +169,7 @@ Manifests were deployed at boostrapping the cluster: [bootstrap/cert-manager/kus
 
 ## 06 Secrets: SOPS, encrypted in Git
 
-I keep secrets **in the repo** but encrypted with SOPS (age). Flux decrypts at apply time, so I get Git history without leaking credentials. Policy lives at the root: [.sops.yaml](https://github.com/sonda-red/cluster-management/blob/main/.sops.yaml). I encrypt per‑app secrets next to the app manifests. In a helm context, Flus uses it's secret generator to decrypt the secrets and pass them to the helm release.
+I keep secrets **in the repo** but encrypted with SOPS (age). Flux decrypts at apply time, so I get Git history without leaking credentials. Policy lives at the root: [.sops.yaml](https://github.com/sonda-red/cluster-management/blob/main/.sops.yaml). I encrypt per‑app secrets next to the app manifests. In a helm context, Flux uses its secret generator to decrypt the secrets and pass them to the helm release.
 
 Keys are off‑repo. The cluster only knows the age private key needed by Flux to decrypt.
 
@@ -177,7 +177,7 @@ Keys are off‑repo. The cluster only knows the age private key needed by Flux t
 
 ## 07 Architecture diagram
 
-Below is the map I keep in my head. Central services (Postgres, Redis, MinIO) are shared by design; Harbor is just the first consumer but each later component requiring them will connect to them and not run it's separate service. **Ingress mainly fronts internal UIs** — Harbor, MinIO Console, Grafana, and VictoriaLogs.
+Below is the map I keep in my head. Central services (Postgres, Redis, MinIO) are shared by design; Harbor is just the first consumer but each later component requiring them will connect to them and not run its separate service. **Ingress mainly fronts internal UIs** — Harbor, MinIO Console, Grafana, and VictoriaLogs.
 
 [![Architecture diagram](/images/post-04/sonda-red-cluster-v3.png)](/images/post-04/sonda-red-cluster-v3.png)
 
@@ -199,7 +199,7 @@ Reusable bits for Helm releases: [templates/flux/helm-release/](https://github.c
 
 > A note on observability:
 
-My stack is too simple, intentionally. A full observability is a bit out of my scope, especially setting up alerting, etc. I have the basics down, as well as the default dashboards in grafana but I mainly stay in `Lens` to follow logs or deployment status, while I'm working on the cluster.
+My stack is intentionally simple. Full observability is a bit out of my scope, especially setting up alerting, etc. I have the basics down, as well as the default dashboards in Grafana, but I mainly stay in `Lens` to follow logs or deployment status while I'm working on the cluster.
 
 | Lens Workload Overview | Master Node Status View |
 |:--------------:|:-------------:|
@@ -207,7 +207,7 @@ My stack is too simple, intentionally. A full observability is a bit out of my s
 
 ###### Central services
 
-I chose **central** Postgres, **central** Redis, and **central** MinIO as cluster services. Today only Harbor consumes them, but they’re **for the whole cluster**. That keeps state small in number of places and easy to back up. Minio takes the largest chunk of storage from the 2 TB NVMe, as it's intended to be the S3 backend for most apps and I'll try to avoid persistent volumes when I can.
+I chose **central** Postgres, **central** Redis, and **central** MinIO as cluster services. Today only Harbor consumes them, but they’re **for the whole cluster**. That keeps state small in number of places and easy to back up. MinIO takes the largest chunk of storage from the 2 TB NVMe, as it's intended to be the S3 backend for most apps and I'll try to avoid persistent volumes when I can.
 
 Harbor points to the shared services explicitly (values excerpt):
 
@@ -232,7 +232,7 @@ Full manifests sit under [infrastructure/harbor/](https://github.com/sonda-red/c
 
 * **Upgrades:** System Upgrade Controller → [flux-system/system-upgrade-controller.yaml](https://github.com/sonda-red/cluster-management/blob/main/clusters/sonda-red/flux-system/system-upgrade-controller.yaml)
 
- k3s has a [system-upgrade-controller](https://github.com/rancher/system-upgrade-controller), which is not built in but seperately installed. It consists of an operator and a controller that watches for `Plan` resources and applies them to the nodes. The nodes are adequately drained, cordoned and upgraded. I use it to upgrade the k3s version from within the cluster, so I can just change the version in the `Plan` and it will apply it to all nodes, without having to run k3s scripts on the nodes manually.
+ k3s has a [system-upgrade-controller](https://github.com/rancher/system-upgrade-controller), which is not built in but separately installed. It consists of an operator and a controller that watches for `Plan` resources and applies them to the nodes. The nodes are adequately drained, cordoned and upgraded. I use it to upgrade the k3s version from within the cluster, so I can just change the version in the `Plan` and it will apply it to all nodes, without having to run k3s scripts on the nodes manually.
 
  An upgrade `Plan` looks like this:
 
@@ -303,7 +303,7 @@ spec:
 * **Node inventory:** Node Feature Discovery → [infrastructure/nfd/](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/nfd)
 It detects the presence of Intel GPUs and labels them accordingly. GPU plugin’s node selector is used to deploy plugin to nodes which have such a GPU label.
 * **Intel Device Operator:** Intel Device Operator → [infrastructure/intel-device-operator/](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/intel-device-operator)
-Intel Device Plugins Operator is a Kubernetes custom controller whose goal is to serve the installation and lifecycle management of Intel device plugins for Kubernetes. It provides a single point of control for GPU, QAT, SGX, FPGA, DSA and DLB devices to a cluster administrators.
+Intel Device Plugins Operator is a Kubernetes custom controller whose goal is to serve the installation and lifecycle management of Intel device plugins for Kubernetes. It provides a single point of control for GPU, QAT, SGX, FPGA, DSA and DLB devices to cluster administrators.
 * **Intel GPU plugin:** Intel Device Plugin → [infrastructure/intel-device-plugins-gpu/](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/intel-device-plugins-gpu)
 
 As taken from the official docs: https://intel.github.io/intel-device-plugins-for-kubernetes/cmd/gpu_plugin/README.html
@@ -337,7 +337,7 @@ I0817 13:01:13.629689       1 gpu_plugin.go:92] Select nonePolicy for GPU device
 I0817 13:01:13.629703       1 gpu_plugin.go:138] Allocate deviceIds: ["card0-0"]
 
 ```
-This log shows the Intel GPU plugin found the two Arc GPUs, registered it with the kubelet, and now pods can request it by adding `resources.requests: { gpu.intel.com/i915: 1 }`. The monitoring resource is also available if you deploy the sidecar/telemetry components.
+This log shows the Intel GPU plugin found the two Arc GPUs, registered them with the kubelet, and now pods can request them by adding `resources.requests: { gpu.intel.com/i915: 1 }`. The monitoring resource is also available if you deploy the sidecar/telemetry components.
 
 ### Component updates
 

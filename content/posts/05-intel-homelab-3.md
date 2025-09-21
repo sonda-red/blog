@@ -13,6 +13,31 @@ tags = ["k8s", "mlops", "intel", "homelab", "devops", "gpu", "arc", "a770", "int
 
 > Disclaimer: This is not production guidance and it is not sponsored. It documents what actually ran in my homelab with Arc GPUs and k3s. Please double-check before you roll it into your own setup.
 
+## Table of Contents
+- [Table of Contents](#table-of-contents)
+- [00 Reflecting on a year of learning](#00-reflecting-on-a-year-of-learning)
+- [01 The Stack at a Glance](#01-the-stack-at-a-glance)
+- [02 Packaging and Storage](#02-packaging-and-storage)
+  - [**Aim**](#aim)
+  - [**Stack**](#stack)
+  - [**Actions I took**](#actions-i-took)
+    - [**Supplying models to workloads**](#supplying-models-to-workloads)
+  - [**Challenges**](#challenges)
+- [03 GPU Allocation](#03-gpu-allocation)
+  - [**Aim**](#aim-1)
+  - [**Stack**](#stack-1)
+  - [**Actions I took**](#actions-i-took-1)
+    - [**k3s specifics**](#k3s-specifics)
+  - [**Challenges**](#challenges-1)
+- [04 Application Layer](#04-application-layer)
+  - [**Aim**](#aim-2)
+  - [**Stack**](#stack-2)
+  - [**Actions I took**](#actions-i-took-2)
+- [05 Monitoring and Observability](#05-monitoring-and-observability)
+- [06 What was hard and what I’ll cover next](#06-what-was-hard-and-what-ill-cover-next)
+- [07 Closing](#07-closing)
+  - [Repo pointers (for the curious)](#repo-pointers-for-the-curious)
+
 > Some personal notes follow below. If you want to skip them, scroll to the next section or use the table of contents.
 
 ## 00 Reflecting on a year of learning
@@ -423,6 +448,24 @@ The Intel plugin forces you into a cluster-wide choice between exclusivity or sh
 ---
 
 ## 04 Application Layer
+
+> Where it all comes together.
+
+[![Hello world!](/images/post-05/openwebui.png)](/images/post-05/openwebui.png)
+
+This part of the stack is relatively straightforward as it basically provides the user-facing API and web UI. The challenges faced in the previous steps trickled down from here, as vLLM and OpenWebUI work as intended and all issues were tied to the underlying infrastructure layers.
+
+### **Aim**
+1. Serve an OpenAI-compatible API.
+2. Host a web UI to interact with the models.
+
+### **Stack**
+* **vLLM** for the OpenAI-compatible API
+* **OpenWebUI** for the web interface
+
+### **Actions I took**
+1) Deployed OpenWebUI with Helm, Postgres, and Redis.
+2) Deployed vLLM with KitOps and DRA claims.
 
 **OpenWebUI**
 

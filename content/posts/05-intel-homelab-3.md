@@ -7,6 +7,8 @@ categories = ["lab notes"]
 tags = ["k8s", "mlops", "intel", "homelab", "devops", "gpu", "arc", "a770", "intel-arc", "kubernetes", "k3s"]
 +++
 
+[![Intel AI Inference Platform MVP](/images/post-05/thumb.png)](/images/post-05/thumb.png)
+
 > Link to Part 2: [Laying the Cluster Foundation](https://blog.sonda.red/posts/04-intel-homelab-2/)
 
 > Disclaimer: This is not production guidance and it is not sponsored. It documents what actually ran in my homelab with Arc GPUs and k3s. Please double-check before you roll it into your own setup.
@@ -31,7 +33,7 @@ I'm happy I now I have a platform I can upgrade and develop on top of, while som
 
 ## 01 The Stack at a Glance
 
-[![Architecture diagram](/images/post-5/arch-infr-left.png)](/images/post-5/arch-infr-left.png)
+[![Architecture diagram](/images/post-05/arch-infr-left.png)](/images/post-05/arch-infr-left.png)
 
 Users hit OpenWebUI. OpenWebUI talks to vLLM which serves an OpenAI-compatible API. Models are packaged with KitOps and stored in Harbor with blobs in MinIO. vLLM starts with KitOps as a sidecar and pulls weights from Harbor. GPU access uses Dynamic Resource Allocation (DRA) and Intel resource drivers. Prometheus and VictoriaLogs leverage the services and `xpumanager` to feed Grafana so I can see metrics and logs in one place.
 

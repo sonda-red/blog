@@ -620,7 +620,9 @@ In the future I'll need to explore this further and write a custom lifecycle han
 
 In the my LinkedIn promo about the previous post I shared a screenshot of how I used to monitor my two A770 GPUs with `intel_gpu_top`, `docker stats` and `bashtop` in terminal windows side by side. It was a bit clunky, but it worked. However, I wanted a more robust solution that would give me historical data, alerts, and a better overview of the system.
 
+{{< rawhtml >}}
 <iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:7363286511296856065?collapsed=1" height="550" width="504" frameborder="0" allowfullscreen="" title="Embedded post"></iframe>
+{{< /rawhtml >}}
 
 **Aim**
 

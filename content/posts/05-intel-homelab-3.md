@@ -11,67 +11,75 @@ tags = ["k8s", "mlops", "intel", "homelab", "devops", "gpu", "arc", "a770", "int
 
 > Link to Part 2: [Laying the Cluster Foundation](https://blog.sonda.red/posts/04-intel-homelab-2/)
 
-> Disclaimer: This is not production guidance and it is not sponsored. It documents what actually ran in my homelab with Arc GPUs and k3s. Please double-check before you roll it into your own setup.
-
+> Disclaimer: This is not production guidance and it is not sponsored. It documents what actually ran in my homelab with Arc GPUs and k3s. Please double-check before you roll it into your own setup. 
+ 
 ## Table of Contents
 - [Table of Contents](#table-of-contents)
 - [00 Reflecting on a year of learning](#00-reflecting-on-a-year-of-learning)
 - [01 The Stack at a Glance](#01-the-stack-at-a-glance)
 - [02 Packaging and Storage](#02-packaging-and-storage)
-  - [**Aim**](#aim)
-  - [**Stack**](#stack)
-  - [**Actions I took**](#actions-i-took)
-    - [**Supplying models to workloads**](#supplying-models-to-workloads)
-  - [**Challenges**](#challenges)
+  - [Aim](#aim)
+  - [Stack](#stack)
+  - [Actions I took](#actions-i-took)
+    - [Supplying models to workloads](#supplying-models-to-workloads)
+  - [Challenges](#challenges)
+    - [Network considerations](#network-considerations)
 - [03 GPU Allocation](#03-gpu-allocation)
-  - [**Aim**](#aim-1)
-  - [**Stack**](#stack-1)
-  - [**Actions I took**](#actions-i-took-1)
-    - [**k3s specifics**](#k3s-specifics)
-  - [**Challenges**](#challenges-1)
+  - [Aim](#aim-1)
+  - [Stack](#stack-1)
+  - [Actions I took](#actions-i-took-1)
+    - [What DRA is](#what-dra-is)
+    - [Enable CDI in containerd](#enable-cdi-in-containerd)
+    - [Intel resource driver DaemonSet](#intel-resource-driver-daemonset)
+  - [Challenges](#challenges-1)
+    - [If you’re still on the classic Intel device plugin (shares)](#if-youre-still-on-the-classic-intel-device-plugin-shares)
+    - [Conclusion:](#conclusion)
 - [04 Application Layer](#04-application-layer)
-  - [**Aim**](#aim-2)
-  - [**Stack**](#stack-2)
-  - [**Actions I took**](#actions-i-took-2)
-  - [**Challenges**](#challenges-2)
+  - [Aim](#aim-2)
+  - [Stack](#stack-2)
+  - [Actions I took](#actions-i-took-2)
+    - [OpenWebUI](#openwebui)
+    - [vLLM with KitOps ModelKit and DRA claims](#vllm-with-kitops-modelkit-and-dra-claims)
+  - [Challenges](#challenges-2)
+    - [Graceful shutdowns](#graceful-shutdowns)
 - [05 Monitoring and Observability](#05-monitoring-and-observability)
-  - [**Aim**](#aim-3)
-  - [**Stack**](#stack-3)
-- [**Actions I took**](#actions-i-took-3)
-- [06 What was hard and what I’ll cover next](#06-what-was-hard-and-what-ill-cover-next)
-- [07 Closing](#07-closing)
-  - [Repo pointers (for the curious)](#repo-pointers-for-the-curious)
+  - [Aim](#aim-3)
+  - [Stack](#stack-3)
+  - [Actions I took](#actions-i-took-3)
+  - [Challenges](#challenges-3)
+    - [xpumanager](#xpumanager)
+- [Conclusion](#conclusion-1)
 
 > Some personal notes follow below. If you want to skip them, scroll to the next section or use the table of contents.
 
 ## 00 Reflecting on a year of learning
 
-I ordered the first Intel Arc A770 almost exaclty a year ago on September 17 2024 and told myself I'll learn how AI works on kubernetes, because I've spent the money on the hardware anyway. I have to confess the build did gather dust for a few months due to life/work but I did manage in roughly an year to achieve 3 key goals:
+I ordered the first Intel Arc A770 almost exactly a year ago on September 17, 2024, and told myself I'll learn how AI works on Kubernetes, because I've spent the money on the hardware anyway. I have to confess the build did gather dust for a few months due to life/work, but I did manage in roughly a year to achieve 3 key goals:
 
 - **Stable inference MVP.** Intel Arc GPUs run reliably inside Kubernetes.  
 - **My own OpenAI-compatible API on a budget.** Two GPUs cost about €600 in total. I don’t pay tokens or cloud credits. It’s slower and less convenient than cloud. 
 - **Transferable knowledge.** I stayed with open standards and open source so I can apply the same ideas elsewhere.
 
-In this regard I'm most grateful for the experience I gained with Kubernetes in general, FluxCD, the new concept of Dynamic Resource Allocation and packaging models with KitOps.
+In this regard, I'm most grateful for the experience I gained with Kubernetes in general, FluxCD, the new concept of Dynamic Resource Allocation and packaging models with KitOps.
 
-Not a lot is it?
+Not a lot, is it?
 
-Well, everything seemed intimidating at first as it was very unfamiliar. I especially remember the first times reading docs or articles on the topic of LLMs and I didn't understand more than 80% of the content. Terms like FP8, BF16, KV cache, Context length, 8B/13B/70B param, VRAM, Quantization 4-bit/8-bit, LoRA/QLoRA. Getting familiar with python environments, dealing with intel's extenion for pytorch before xpu support got merged upstream. A lot of hours reading github issues, because documentation was often and still is very much lagging behind or missing on the issues I was facing. Intel's CEO switches and company restructuring doesn't help the ecosystem either and it was felt while trying to make all this work. But I digress...
+Well, everything seemed intimidating at first as it was very unfamiliar. I especially remember the first times reading docs or articles on the topic of LLMs and I didn't understand more than 80% of the content. Terms like FP8, BF16, KV cache, context length, 8B/13B/70B param, VRAM, quantization 4-bit/8-bit, LoRA/QLoRA. Getting familiar with Python environments, dealing with Intel's extension for PyTorch before XPU support got merged upstream. A lot of hours reading GitHub issues, because documentation was often and still is very much lagging behind or missing on the issues I was facing. Intel's CEO switches and company restructuring don't help the ecosystem either, and it was felt while trying to make all this work. But I digress...
 
-I'm happy I now I have a platform I can upgrade and develop on top of, while somewhat understanding it on a more fundamental level.
+I'm happy I now have a platform I can upgrade and develop on top of, while somewhat understanding it on a more fundamental level.
 
 ## 01 The Stack at a Glance
 
 [![Architecture diagram](/images/post-05/arch-infr-left.png)](/images/post-05/arch-infr-left.png)
 
-Users hit OpenWebUI. OpenWebUI talks to vLLM which serves an OpenAI-compatible API. Models are packaged with KitOps and stored in Harbor with blobs in MinIO. vLLM starts with KitOps as a sidecar and pulls weights from Harbor. GPU access uses Dynamic Resource Allocation (DRA) and Intel resource drivers. Prometheus and VictoriaLogs leverage the services and `xpumanager` to feed Grafana so I can see metrics and logs in one place.
+Users hit OpenWebUI. OpenWebUI talks to vLLM which serves an OpenAI-compatible API. Models are packaged with KitOps and stored in Harbor with blobs in MinIO. vLLM starts with KitOps as a sidecar and pulls weights from Harbor. GPU access uses Dynamic Resource Allocation (DRA) and Intel resource drivers. [Prometheus](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/monitoring/kube-prometheus-stack) and [VictoriaLogs](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/monitoring/victorialogs) leverage the services and `xpumanager` to feed Grafana so I can see metrics and logs in one place.
 
 I've named this article "MVP" because this is not a production-ready stack. But it's stable, working, and I can iterate on it. You'll see below in the notes where I describe the challenges how a lot of times a small part of the stack was not working as expected and broke balance.
 
 The three main pillars of the stack are:
-1) Packaging and Storage
-2) GPU Allocation
-4) Monitoring and Observability
+1. Packaging and Storage
+2. GPU Allocation
+3. Monitoring and Observability
 
 These 3 allow the application layer to run reliably. I will cover each in turn below.
 
@@ -79,47 +87,47 @@ These 3 allow the application layer to run reliably. I will cover each in turn b
 
 ## 02 Packaging and Storage
 
-This really is the backbone of the stack. If you can't get models to the workloads reliably, the rest falls apart. When we're dealing with small docker continaners, pulling a few hundred MBs from DockerHub is no big deal.
+This really is the backbone of the stack. If you can't get models to the workloads reliably, the rest falls apart. When we're dealing with small Docker containers, pulling a few hundred MBs from Docker Hub is no big deal.
 
 Imagine baking in the 122GB DeepSeek-R1-Distill-Qwen-32B model into a container image and you had a typo in the Dockerfile. Are you going to rebuild it? How long will it take? How much space will it take on your registry? What if you want to try a different model? Do you bake it in again?
 
-Let's download it from HuggingFace into a volume then? That's the solution right? You'd have to architect a solution not only for reliable pulling but for versioning that handles exact dataset, code, hyperparameters, etc. You need to roll back or run on small differences between models. What's the best practice for that?
+Let's download it from HuggingFace into a volume then? That's the solution, right? You'd have to architect a solution not only for reliable pulling but for versioning that handles exact dataset, code, hyperparameters, etc. You need to roll back or run on small differences between models. What's the best practice for that?
 
-### **Aim**  
-1) Version models and move them between workloads without surprises.  
-2) Keep I/O paths short so large pulls and unpacks don’t stall pods.
+### Aim
+1. Version models and move them between workloads without surprises.
+2. Keep I/O paths short so large pulls and unpacks don’t stall pods.
 
-### **Stack**  
-- MinIO (S3) - as a Helm release on the GPU node 
-- Harbor (OCI registry) - as a Helm release on the GPU node
-- KitOps (ModelKits) - as a sidecar in vLLM workloads
-- Postgres and Redis for app state - as Helm releases on NUC nodes
+### Stack
+- [MinIO (S3)](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/minio) - as a Helm release on the GPU node
+- [Harbor (OCI registry)](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/harbor) - as a Helm release on the GPU node
+- KitOps (ModelKits) - as a sidecar in [vLLM workloads](https://github.com/sonda-red/cluster-management/tree/main/deployments/vllm)
+- [Postgres](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/postgresql) and [Redis](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/redis) for app state - as Helm releases on NUC nodes
 
-### **Actions I took**  
-1) Gave MinIO a large PV on the GPU node.  
-2) Set Harbor to use S3 as backend.
+### Actions I took
+1. Gave MinIO a large PV on the GPU node.
+2. Set Harbor to use S3 as backend.
 
 Both of these steps are described in more detail in the previous [post](https://blog.sonda.red/posts/04-intel-homelab-2/#more-or-less-self-explanatory-infrastructure-components).
 
-3) Pinned Harbor to the GPU node with node affinity to avoid cross-node traffic.
-4) Pushed models as KitOps ModelKits to Harbor and referenced them from vLLM.
+3. Pinned Harbor to the GPU node with node affinity to avoid cross-node traffic.
+4. Pushed models as KitOps ModelKits to Harbor and referenced them from vLLM.
 
 
-#### **Supplying models to workloads**
+#### Supplying models to workloads
 
 I already had some models downloaded locally from my local tests:
-- DeepSeek-R1-Distill-Llama-8B 
-- DeepSeek-R1-Distill-Qwen-14B  
-- DeepSeek-R1-Distill-Qwen-1.5B  
-- DeepSeek-R1-Distill-Qwen-32B  
-- DeepSeek-R1-Distill-Qwen-7B 
-- Llama-2-13b-chat-hf 
+- DeepSeek-R1-Distill-Llama-8B
+- DeepSeek-R1-Distill-Qwen-14B
+- DeepSeek-R1-Distill-Qwen-1.5B
+- DeepSeek-R1-Distill-Qwen-32B
+- DeepSeek-R1-Distill-Qwen-7B
+- Llama-2-13b-chat-hf
 - Llama-2-13b-hf
-- Llama-2-7b-chat-hf 
-- Llama-3.1-8B-Instruct 
-- Llama-3.2-3B-Instruct 
+- Llama-2-7b-chat-hf
+- Llama-3.1-8B-Instruct
+- Llama-3.2-3B-Instruct
 
-In a local docker environment I would just mount a volume and point the model loader to it.
+In a local Docker environment, I would just mount a volume and point the model loader to it.
 
 `docker-compose.yaml`
 ```yaml
@@ -155,7 +163,7 @@ services:
       - /data/llm/webui:/app/backend/data
 ```
 
-In kubernetes, I could always mount a host path to a volume and call it a day. However this is a dirty, wasteful and unsustainable solution, not at all applicable to workloads at scale. I found [**KitOps**](https://kitops.org/) which packages models as OCI images (ModelKits) and can push/pull them from any OCI registry (Harbor in my case). It's not the only thing it does, be sure to explore it in their docs. In short, it helps if:
+In Kubernetes, I could always mount a host path to a volume and call it a day. However, this is a dirty, wasteful, and unsustainable solution, not at all applicable to workloads at scale. I found [**KitOps**](https://kitops.org/) which packages models as OCI images (ModelKits) and can push/pull them from any OCI registry (Harbor in my case). It's not the only thing it does; be sure to explore it in their docs. In short, it helps if:
 - You have multiple models / datasets being developed in parallel.
 - Experimentation to production hand-offs are a pain: “but which dataset?”, “which model version?”, “what code was used?"
 - You care about audit/compliance or want tighter security.
@@ -219,13 +227,13 @@ harbor.sonda.red.local/sonda-red/ds-r1-qwen-32b        0.0.1    Kalin Daskalov  
 harbor.sonda.red.local/sonda-red/llama-3.1-8b          0.0.1    Kalin Daskalov   llama-3.1-8b      59.8 GiB    sha256:6dbbab498985a21f95728219a1dbbec7ff76e7190107badffc9ae8766ce71552
 ```
 
-### **Challenges**
+### Challenges
 
-**Network considerations**
+#### Network considerations
 
-- In my case, the ingress controller load balancer service has a MetalLB VIP. If pods or hosts resolve harbor.sonda.red.local to the MetalLB VIP, traffic leaves the node and comes back. Big blobs transfer at very low speeds because my gpu node is far from the router and NUC master and worker node. I connect it to the same network via WiFi, but it's still a bottleneck.
+- In my case, the ingress controller load balancer service has a [MetalLB](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/metallb) VIP. If pods or hosts resolve harbor.sonda.red.local to the MetalLB VIP, traffic leaves the node and comes back. Big blobs transfer at very low speeds because my GPU node is far from the router and NUC master and worker node. I connect it to the same network via WiFi, but it's still a bottleneck.
 - If you're hosting your own object storage, registry, and GPU workloads, try to keep them on the same node or ensure nodes have a fast path between them.
-- Leveraging cilium's topology-aware routing helps keep traffic local.
+- Leveraging Cilium's topology-aware routing helps keep traffic local.
 - Your ingress controller (NGINX in my case) may have body size limits and timeouts that choke big pushes/pulls.
 ```yaml
 metadata:
@@ -241,40 +249,38 @@ metadata:
 
 ## 03 GPU Allocation
 
-I though I had it all figured out with the classic Intel device operator and GPU plugin that I described in my [previous post](https://blog.sonda.red/posts/04-intel-homelab-2/#intel-gpu-specifics), but I ran into issues when trying to run tensor parallel workloads.
+I thought I had it all figured out with the classic Intel device operator and GPU plugin that I described in my [previous post](https://blog.sonda.red/posts/04-intel-homelab-2/#intel-gpu-specifics), but I ran into issues when trying to run tensor parallel workloads.
 
-When researching for an alternative, I found about the rather new Kubernetes [Dynamic Resource Allocation (DRA)](https://kubernetes.io/docs/concepts/scheduling-eviction/dra/) API that acts similarly [dynamic volume provisioning](https://kubernetes.io/docs/concepts/storage/dynamic-provisioning/), in which you use PersistentVolumeClaims to claim storage capacity from storage classes and request the claimed capacity in your Pods.
+When researching for an alternative, I found the rather new Kubernetes [Dynamic Resource Allocation (DRA)](https://kubernetes.io/docs/concepts/scheduling-eviction/dra/) API that acts similarly to [dynamic volume provisioning](https://kubernetes.io/docs/concepts/storage/dynamic-provisioning/), in which you use PersistentVolumeClaims to claim storage capacity from storage classes and request the claimed capacity in your Pods.
 
 I decided to give DRA a try as it seemed to fix what I kept struggling with.
 
-### **Aim**
+### Aim
 
 1. Make Intel GPUs discoverable and claimable by workloads.
-2. Claim multiple GPUs for one workload
+2. Claim multiple GPUs for one workload.
 3. Make multiple workloads share the same GPU claim.
 
-### **Stack**
+### Stack
 
-* k3s 1.33 / 1.34
-* Dynamic Resource Allocation (References as DRA below)
-* [Intel **resource driver** for `gpu.intel.com`](https://github.com/intel/intel-resource-drivers-for-kubernetes)
-* containerd with **CDI** enabled
+- k3s 1.33 / 1.34
+- Dynamic Resource Allocation (References as DRA below)
+- [Intel resource drivers (gpu.intel.com)](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/intel-resource-drivers)
+- containerd with **CDI** enabled
 
-### **Actions I took**
-1) Enabled DRA and CDI in k3s and containerd.
-2) Installed the Intel resource driver DaemonSet.
-3) Created ResourceClass and ResourceClaimTemplate objects.
-4) Requested claims from vLLM workloads.
+### Actions I took
+1. Enabled DRA and CDI in k3s and containerd.
+2. Installed the Intel resource driver DaemonSet.
+3. Created ResourceClass and ResourceClaimTemplate objects.
+4. Requested claims from vLLM workloads.
 
-#### **k3s specifics**
-
-**What DRA is**
-DRA lets pods request vendor devices through first class APIs instead of opaque `resourceName` counters. It introduces `DeviceClass`, `ResourceClaim` or `ResourceClaimTemplate`, and `ResourceSlice`. A DRA driver advertises devices and uses CDI to inject them into pods.
+#### What DRA is
+DRA lets pods request vendor devices through first-class APIs instead of opaque `resourceName` counters. It introduces `DeviceClass`, `ResourceClaim` or `ResourceClaimTemplate`, and `ResourceSlice`. A DRA driver advertises devices and uses CDI to inject them into pods.
 
 In regards to vanilla Kubernetes, DRA reached `v1` and was enabled by default in version `1.34`. However, I was running k3s `v1.33.4+k3s1`, which was the latest stable release at the time. A few issues I hit:
 - k3s `1.33.4+k3s1` did not have DRA enabled by default
 - Intel resource drivers templates are all `v1beta1` and the API group was not served by default in k3s `1.33.4+k3s1`
-- Playing around with feature gates and runtime config flags was needed to get DRA working but mixing up API versions and feature gates caused confusion, because in 1.33 the API version is `v1beta2`.
+- Playing around with feature gates and runtime config flags was needed to get DRA working, but mixing up API versions and feature gates caused confusion, because in 1.33 the API version is `v1beta2`.
 - Took the risk and upgraded to k3s `1.34.1-rc+k3s1` pre-release, which didn't enable the feature gate by default either, but at least the API group was served by default and I could use `v1` resources.
 
 [Feature gates](https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/) in Kubernetes are a way to enable or disable experimental or optional features. In this case, the feature gate `DynamicResourceAllocation` needs to be enabled for DRA to work. In k3s, you can pass feature gates to the kube-apiserver, kube-controller-manager, kube-scheduler, and kubelet components via the k3s config file.
@@ -298,7 +304,7 @@ To enable the `resource.k8s.io/v1beta1` API group in k3s 1.33, you can use the `
 kube-apiserver-arg:
   - runtime-config=resource.k8s.io/v1beta1=true
 ```
-**Enable CDI in containerd**
+#### Enable CDI in containerd
 
 k3s uses containerd as its only built-in container runtime, running it as an integrated lightweight service with simplified defaults and patches, whereas vanilla Kubernetes leaves containerd (or another CRI runtime) as a separately installed and managed component. Configuring containerd in k3s is done via the k3s config file, but you need to create a custom `config.toml` file for containerd itself, especially on the node where the Intel resource driver DaemonSet will run (the GPU node). In contrast, the feature gate for DRA is set in the k3s config file on the master node.
 
@@ -311,11 +317,11 @@ Intel resource driver docs have a [section in their docs](https://github.com/int
   cdi_spec_dirs = ["/etc/cdi", "/var/run/cdi"]
 ```
 
-**Intel resource driver DaemonSet**
+#### Intel resource driver DaemonSet
 
-From here on, installing the Intel resource driver is rather straightforward and [their docs are clear](https://github.com/intel/intel-resource-drivers-for-kubernetes/blob/main/doc/gpu/USAGE.md). You have options ot use NFD or not, I chose not to. The DaemonSet will run only on the GPU node with a nodeSelector. You can install the raw manifests or use Helm. [I chose Helm](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/intel-resource-drivers) and discarded all traces of the intel device operator and GPU plugin.
+From here on, installing the Intel resource driver is rather straightforward and [their docs are clear](https://github.com/intel/intel-resource-drivers-for-kubernetes/blob/main/doc/gpu/USAGE.md). You have options to use NFD or not; I chose not to. The DaemonSet will run only on the GPU node with a nodeSelector. You can install the raw manifests or use Helm. [I chose Helm](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/intel-resource-drivers) and discarded all traces of the Intel device operator and GPU plugin.
 
-Veryfication that the DaemonSet is running and devices are advertised:
+Verification that the DaemonSet is running and devices are advertised:
 
 ```bash
 kubectl api-resources --api-group=resource.k8s.io
@@ -336,7 +342,7 @@ sonda-core-gpu.intel.com-z2z9z   sonda-core   gpu.intel.com   sonda-core   5d17h
 
 From the output above, you can see that the `gpu.intel.com` DeviceClass is registered and the `sonda-core` node (my GPU node) has a ResourceSlice with Intel GPUs. Two of the resources are namespaced (`ResourceClaim` and `ResourceClaimTemplate`) because they are requested by pods, while `DeviceClass` and `ResourceSlice` are cluster-wide.
 
-Since the workloads will be concentrated mostly in the `vllm` namespace, I created the ResourceClaimTemplates there.
+Since the workloads will be concentrated mostly in the `vllm` namespace, I created the ResourceClaimTemplates there ([deployments/vllm/resource-claim-templates.yaml](https://github.com/sonda-red/cluster-management/blob/main/deployments/vllm/resource-claim-templates.yaml)).
 
 [`deployments/vllm/resource-claim-templates.yaml`](https://github.com/sonda-red/cluster-management/blob/main/deployments/vllm/resource-claim-templates.yaml)
 ```yaml
@@ -378,9 +384,14 @@ spec:
                 expression: 'device.attributes["gpu.intel.com"].model == "A770"'
           deviceClassName: gpu.intel.com
 ```
-### **Challenges**
 
-**If you’re still on the classic Intel device plugin (shares)**
+Due to my CPU being the Intel i9-12900K with integrated Intel UHD 770 graphics, it also appears as an available GPU device. To avoid workloads being scheduled on the iGPU, I used a CEL expression to filter only discrete GPUs (A770 in my case). CEL is a simple expression language that can be used in Kubernetes for various purposes, including filtering devices based on their attributes.
+
+Exploring your ResourceSlice with `kubectl describe` can help you identify the exact model names of your GPUs, as well as attributes like memory size, vendor, etc. You can then use these attributes in your CEL expressions to filter devices according to your requirements.
+
+### Challenges
+
+#### If you’re still on the classic Intel device plugin (shares)
 
 With the Intel device GPU plugin we had this particular setup:
 ```yaml
@@ -414,7 +425,7 @@ spec:
           gpu.intel.com/i915: 1
 ```
 
-Everything works fine. You see the GPU from within the pod and your inference app works. However if we change the `limits` to `gpu.intel.com/i915: 2` things break.
+Everything works fine. You see the GPU from within the pod and your inference app works. However, if we change the `limits` to `gpu.intel.com/i915: 2`, things break.
 
 Why?
 
@@ -445,7 +456,7 @@ On a node with **2 GPUs**, here’s what each approach can (and cannot) do:
 > The plugin’s `-allocation-policy` only steers **share** placement; DRA gives **claim-level guarantees**.
 
 
-**Conclusion:**  
+#### Conclusion:
 The Intel plugin forces you into a cluster-wide choice between exclusivity or sharing, while DRA lets you mix and match all four scenarios safely within the same cluster.
 
 
@@ -459,29 +470,33 @@ The Intel plugin forces you into a cluster-wide choice between exclusivity or sh
 
 This part of the stack is relatively straightforward as it basically provides the user-facing API and web UI. The challenges faced in the previous steps trickled down from here, as vLLM and OpenWebUI work as intended and all issues were tied to the underlying infrastructure layers.
 
-### **Aim**
+### Aim
 1. Serve an OpenAI-compatible API.
 2. Host a web UI to interact with the models.
 
-### **Stack**
-* **vLLM** for the OpenAI-compatible API
-* **OpenWebUI** for the web interface
+### Stack
+- **vLLM** for the OpenAI-compatible API
+- **OpenWebUI** for the web interface
+  
+  Linked manifests:
+  - [deployments/vllm](https://github.com/sonda-red/cluster-management/tree/main/deployments/vllm)
+  - [deployments/openwebui](https://github.com/sonda-red/cluster-management/tree/main/deployments/openwebui)
 
-### **Actions I took**
-1) Deployed OpenWebUI with Helm, Postgres, and Redis.
-2) Deployed vLLM with KitOps and DRA claims.
+### Actions I took
+1. Deployed OpenWebUI with Helm, Postgres, and Redis.
+2. Deployed vLLM with KitOps and DRA claims.
 
-**OpenWebUI**
+#### OpenWebUI
 
-OpenWebUI is a web interface for LLMs that supports multiple backends, including vLLM. It has user management, chat history, and other features. Basically your own ChatGPT interface. I deployed it with Helm and used Postgres for sessions/history and Redis for websockets/cache.
+OpenWebUI is a web interface for LLMs that supports multiple backends, including vLLM. It has user management, chat history, and other features. Basically your own ChatGPT interface. I deployed it with Helm and used Postgres for sessions/history and Redis for WebSockets/cache.
 
-**vLLM with KitOps ModelKit and DRA claims**
+#### vLLM with KitOps ModelKit and DRA claims
 
 Why vLLM?
 
 Not much to say here. Locally, I've tried several options like ollama, llama.cpp and vLLM. I got them all to work with Intel GPUs, but vLLM was configurable and had sane explanations for using multiple GPUs with tensor parallelism. It also has a built-in OpenAI-compatible API server, which is a big plus if you plan on developing services that use the OpenAI API.
 
-Let's disect the key features of the deployment manifest. It's been redacted for showcase purposes, but you can find the full file in the repo link below:
+Let's dissect the key features of the deployment manifest. It's been redacted for showcase purposes, but you can find the full file in the repo link below:
 ➡️ **Exact file in repo:** [`deployments/vllm/vllm-14b-tp2/vllm-14b-tp2.yaml`](https://github.com/sonda-red/cluster-management/blob/main/deployments/vllm/vllm-14b-tp2/vllm-14b-tp2.yaml)
 ```yaml
 # ==============================================================================
@@ -511,6 +526,7 @@ spec:
         kubernetes.io/hostname: sonda-core
       
       # =======================================================================
+      # =======================================================================
       # 🎯 KEY FEATURE #1: Dynamic Resource Allocation for GPU Claims
       # =======================================================================
       # Uses Kubernetes 1.30+ DRA to claim multiple GPUs for tensor parallelism
@@ -519,12 +535,12 @@ spec:
           resourceClaimTemplateName: dual-gpu-claim  # Claims 2x Intel GPUs
       
       # =======================================================================
-      # 🎯 KEY FEATURE #2: Persistent Volume Claims for Model Storage  
+      # 🎯 KEY FEATURE #2: Persistent Volume Claims for Model Storage
       # =======================================================================
       volumes:
       - name: modelkit
         persistentVolumeClaim:
-          claimName: vllm-modelkits  # Shared storage across vLLM instances
+          claimName: vllm-modelkits  # Shared storage across vLLM instances (see PVC manifest: https://github.com/sonda-red/cluster-management/blob/main/deployments/vllm/pvc.yaml)
       - name: dshm
         emptyDir: { medium: Memory, sizeLimit: 16Gi }  # Shared memory for tensor parallel
       
@@ -605,13 +621,13 @@ spec:
   type: ClusterIP
 ```
 
-### **Challenges**
+### Challenges
 
-**Graceful shutdowns**
+#### Graceful shutdowns
 
 The most impactful issue I hit was related to vLLM's handling of shutdown signals. When Kubernetes decides to terminate a pod (for example, during scaling down or rolling updates), it sends a SIGTERM signal to the main container process. vLLM needs to handle this signal gracefully to ensure that ongoing requests are completed and resources are freed properly.
 
-In the future I'll need to explore this further and write a custom lifecycle handler if needed. For now, I set a long `terminationGracePeriodSeconds` to give vLLM enough time to shut down properly. I see this topic is [still actively discussed in the vLLM community](https://github.com/vllm-project/vllm/issues/16667), so hopefully it will improve in future releases.
+In the future, I'll need to explore this further and write a custom lifecycle handler if needed. For now, I set a long `terminationGracePeriodSeconds` to give vLLM enough time to shut down properly. I see this topic is [still actively discussed in the vLLM community](https://github.com/vllm-project/vllm/issues/16667), so hopefully it will improve in future releases.
 
 > ...
 > The goal is that when vLLM shuts down - whether intentionally or due to an internal failure - the cause of shutdown should be logged with a useful level of detail, and the server's resources (especially GPU memory) should be freed.
@@ -621,125 +637,61 @@ In the future I'll need to explore this further and write a custom lifecycle han
 
 ## 05 Monitoring and Observability
 
-In the my LinkedIn promo about the previous post I shared a screenshot of how I used to monitor my two A770 GPUs with `intel_gpu_top`, `docker stats` and `bashtop` in terminal windows side by side. It was clunky and not a solution for Kubernetes.
+In my LinkedIn promo about the previous post I shared a screenshot of how I used to monitor my two A770 GPUs with `intel_gpu_top`, `docker stats` and `bashtop` in terminal windows side by side. It was clunky and not a solution for Kubernetes.
 
 [![Architecture diagram](/images/post-04/manual-monitoring.png)](/images/post-04/manual-monitoring.png)
 
 
-### **Aim**
+### Aim
 
 1. See real GPU load and memory.
 2. See inference throughput and latency next to logs.
 
-### **Stack**
+### Stack
 
-* Prometheus
-* xpumanager
-* VictoriaLogs
-* Grafana
+- Prometheus and Grafana with [kube-prometheus-stack](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/monitoring/kube-prometheus-stack)
+- [xpumanager](https://github.com/sonda-red/cluster-management/tree/main/infrastructure/xpumanager)
 
-## **Actions I took**
-1) Deployed kube-prometheus-stack with Helm.
-2) Deployed xpumanager as a DaemonSet with nodeSelector.
-3) Configured service and ServiceMonitor for xpumanager and vLLM.
-4) Created Grafana dashboards for the `xpum_` metrics
+### Actions I took
+1. Deployed kube-prometheus-stack with Helm.
+2. Set up a monitoring DRA ResourceClaim for xpumanager that doesn't make GPUs unavailable to workloads.
+3. Deployed xpumanager as a DaemonSet with nodeSelector.
+4. Configured service and ServiceMonitor for xpumanager and vLLM.
+5. Created Grafana dashboards for the `xpum_` metrics
 
-Intel's solution for monitoring Arc GPUs and Gaudi accelerators is called **xpumanager**. It exposes GPU metrics over HTTP in a Prometheus-compatible format. I deployed it as a DaemonSet but it's only on the GPU node. It's ServiceMonitor scrapes the `/metrics` endpoint and Prometheus stores the data. I then built a Grafana dashboard to visualize GPU metrics alongside inference throughput and latency from vLLM logs.
+Intel's solution for monitoring Arc GPUs and Gaudi accelerators is called **xpumanager**. It exposes GPU metrics over HTTP in a Prometheus-compatible format. I deployed it as a DaemonSet, but it's only on the GPU node. It's ServiceMonitor scrapes the `/metrics` endpoint and Prometheus stores the data. I then built a Grafana dashboard to visualize GPU metrics alongside inference throughput and latency from vLLM logs ([dashboard JSON](https://github.com/sonda-red/cluster-management/blob/main/infrastructure/monitoring/dashboards/intel-arc-xpu-metrics-dashboard.json)).
 
 | XPU metrics Dashboard | vLLM metrics Dashboard |
 |:--------------:|:-------------:|
 | [![XPU metrics Dashboard](/images/post-05/xpum.png)](/images/post-05/xpum.png) | [![vLLM metrics Dashboard](/images/post-05/vllmm.png)](/images/post-05/vllmm.png) |
 
 
-**xpumanager problems I hit**
+### Challenges
 
-* xpumanager vs Level Zero version mismatches.
-* Device plugin behaved differently across hardware.
-* **xpum\_ metrics over HTTP sometimes return `text/html`**, not Prometheus text → scraper errors.
+#### xpumanager
 
-  * Error looked like:
+I'm really trying to keep a neutral tone here, but the way `xpumanager` is handled in the repos is atrocious. When you go to the official repo of the Intel resource driver and follow the deployment instructions for deploying xpumanager, you hit a few issues:
+1. The monitoring ResourceClaimTemplate uses `v1beta1` in the latest release of the Intel resource drivers. So I need to use my own manifests instead of using the ones from the repo.
+2. xpumanager manifest uses outdated images that need dependency fixes and prevent startup of the monitor service. The issue is still not closed and I'm using the workaround found in the issue comments.
+3. The `/metrics` endpoint sometimes returns HTML instead of Prometheus text.
 
-    ```
-    time=2025-08-31T19:02:04.889Z level=ERROR source=scrape.go:1631 msg="Failed to determine correct type of scrape target." component="scrape manager" scrape_pool=intel-xpumanager target=http://intel-xpumanager.intel.svc:29999/metrics content_type="text/html; charset=utf-8" fallback_media_type="" err="received unsupported Content-Type "text/html; charset=utf-8" and no fallback_scrape_protocol specified for target"
-    ```
-  * Prometheus expects **`text/plain; version=0.0.4`** or **`application/openmetrics-text`**. If you see `text/html`, you’re hitting a web page, not metrics.
-  * Discussion thread I followed: Intel xpumanager issue **#100** → [https://github.com/intel/xpumanager/issues/100](https://github.com/intel/xpumanager/issues/100)
-
-**Expose xpumanager metrics**
-*(my manifests live under `infrastructure/monitoring/` alongside kube-prometheus-stack)*
-
-Service:
-
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: intel-xpumanager
-  labels: { app: xpum }
-spec:
-  selector: { app: xpum }
-  ports:
-    - name: metrics
-      port: 29999
-      targetPort: 29999
+```bash
+time=2025-08-31T19:02:04.889Z level=ERROR source=scrape.go:1631 msg="Failed to determine correct type of scrape target." component="scrape manager" scrape_pool=intel-xpumanager target=http://intel-xpumanager.intel.svc:29999/metrics content_type="text/html; charset=utf-8" fallback_media_type="" err="received unsupported Content-Type \"text/html; charset=utf-8\" and no fallback_scrape_protocol specified for target"
 ```
 
-ServiceMonitor:
+That error means Prometheus is hitting the xpumanager service but instead of getting plain text metrics it’s getting an HTML page.
 
-```yaml
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: intel-xpum
-spec:
-  selector:
-    matchLabels: { app: xpum }
-  endpoints:
-    - port: metrics
-      path: /metrics
-      interval: 15s
-```
+Prometheus only accepts text/plain; version=0.0.4 (the Prometheus exposition format) or OpenMetrics (application/openmetrics-text). If the response is text/html, Prometheus assumes it’s a web page, not metrics. I needed to reconfigure Prometheus to handle this case.
 
-**If you scrape with vmagent**
-Set a fallback for this target: `fallback_scrape_protocol: PrometheusText0.0.4` so HTML doesn’t blow up the scrape while you sort out the exporter.
+4. The [Grafana dashboard available in the xpumanager repo](https://github.com/intel/xpumanager/blob/master/deployment/kubernetes/monitoring/grafana-dashboard.json) is not adapted to Arc GPUs and shows no data for most of its panels. I had to build my own dashboard from scratch ([dashboard JSON](https://github.com/sonda-red/cluster-management/blob/main/infrastructure/monitoring/dashboards/intel-arc-xpu-metrics-dashboard.json)).
+5. Intel Arc A770 doesn't expose all the metrics that xpumanager can collect. For example, temperature is not available on Arc GPUs, so any panel showing temp data will be empty.
 
-**Grafana**
+## Conclusion
 
-* Baseline: Intel GPU dashboard **23251** → [https://grafana.com/grafana/dashboards/23251-intel-gpu-metrics/](https://grafana.com/grafana/dashboards/23251-intel-gpu-metrics/)
-* Keep the panels you actually use; I glued **GPU util/mem** next to **tokens/sec** from vLLM. If util is high while tokens/sec is low, you’re wasting watts.
+This milestone has made the effort of building an Intel Arc GPU based LLM inference stack worthwhile. There were moments when I nearly gave up. I even put the cards up for sale out of frustration, but there were no buyers. That left me more or less forced to make them work. Every time I considered switching to NVIDIA though, the high prices and the reminder that this was meant to be a learning exercise, not a production grade investment, kept me back.
 
-**Free text**
-I care about fewer graphs that tell the truth. For GPUs: utilization, mem, temp, power. For inference: tokens/sec and p95 latency. If those two sets disagree, something is wrong—usually model I/O or a device sharing mistake.
+Now it feels like the fun is just beginning. The plumbing is largely in place: model packaging, GPU allocation, and observability are solved enough to let me shift my focus upward. I can finally spend more time at the application layer and start building useful services on top of the stack, instead of wrestling with infrastructure basics.  
 
----
+The timing also feels right. With [Nvidia buying a $5 billion stake in Intel](https://www.reuters.com/world/asia-pacific/nvidia-bets-big-intel-with-5-billion-stake-chip-partnership-2025-09-18/) and the two companies announcing a [strategic chip design partnership](https://www.intel.com/content/www/us/en/newsroom/news/nvidia-and-intel-announce-strategic-partnership.html), my bet on Intel hardware looks a little less lonely. I am also keeping an eye on the upcoming [Intel Arc Pro B60 series](https://www.intel.com/content/www/us/en/architecture-and-technology/arc-pro-graphics.html). If the single or dual chip models land well, I might add one to the mix for more GPU power.  
 
-## 06 What was hard and what I’ll cover next
-
-* xpumanager and Level Zero didn’t agree at first; exporter format was inconsistent.
-* The DRA API wasn’t served by k3s until I enabled it.
-* Sharing in the device plugin fought tensor parallel; I stopped mixing them.
-* The first inference workflow needed real packaging; KitOps with Harbor solved it.
-
-Each item will get a short deep dive.
-
-## 07 Closing
-
-I now have a working Intel-first inference platform that I can iterate on. It’s not the fastest stack and it’s not point-and-click. It does the job on a sane budget and the knowledge carries over. Next I’ll publish the deep dives on packaging, DRA on k3s, tensor parallel on Intel, and the monitoring setup.
-
----
-
-### Repo pointers (for the curious)
-
-* vLLM with TP + KitOps init (production reference):
-  `deployments/vllm/vllm-14b-tp2/vllm-14b-tp2.yaml` →
-  [https://github.com/sonda-red/cluster-management/blob/main/deployments/vllm/vllm-14b-tp2/vllm-14b-tp2.yaml](https://github.com/sonda-red/cluster-management/blob/main/deployments/vllm/vllm-14b-tp2/vllm-14b-tp2.yaml)
-
-* OpenWebUI manifests live under:
-  `deployments/openwebui/` → [https://github.com/sonda-red/cluster-management/tree/main/deployments/openwebui](https://github.com/sonda-red/cluster-management/tree/main/deployments/openwebui)
-
-* Infra (Harbor, MinIO, monitoring, etc.):
-  `infrastructure/` → [https://github.com/sonda-red/cluster-management/tree/main/infrastructure](https://github.com/sonda-red/cluster-management/tree/main/infrastructure)
-
-```
-::contentReference[oaicite:0]{index=0}
-```
+The next step is to see what meaningful applications can be built on top of this foundation.

@@ -648,7 +648,7 @@ Intel's solution for monitoring Arc GPUs and Gaudi accelerators is called **xpum
 
 | XPU metrics Dashboard | vLLM metrics Dashboard |
 |:--------------:|:-------------:|
-| [![XPU metrics Dashboard](/images/post-05/xpum.png)](/images/post-04/lens.png) | [![vLLM metrics Dashboard](/images/post-05/vllmm.png)](/images/post-05/vllmm.png) |
+| [![XPU metrics Dashboard](/images/post-05/xpum.png)](/images/post-05/xpum.png) | [![vLLM metrics Dashboard](/images/post-05/vllmm.png)](/images/post-05/vllmm.png) |
 
 
 **xpumanager problems I hit**

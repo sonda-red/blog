@@ -35,6 +35,9 @@ tags = ["k8s", "mlops", "intel", "homelab", "devops", "gpu", "arc", "a770", "int
   - [**Actions I took**](#actions-i-took-2)
   - [**Challenges**](#challenges-2)
 - [05 Monitoring and Observability](#05-monitoring-and-observability)
+  - [**Aim**](#aim-3)
+  - [**Stack**](#stack-3)
+- [**Actions I took**](#actions-i-took-3)
 - [06 What was hard and what I’ll cover next](#06-what-was-hard-and-what-ill-cover-next)
 - [07 Closing](#07-closing)
   - [Repo pointers (for the curious)](#repo-pointers-for-the-curious)
@@ -618,23 +621,35 @@ In the future I'll need to explore this further and write a custom lifecycle han
 
 ## 05 Monitoring and Observability
 
-In the my LinkedIn promo about the previous post I shared a screenshot of how I used to monitor my two A770 GPUs with `intel_gpu_top`, `docker stats` and `bashtop` in terminal windows side by side. It was a bit clunky, but it worked. However, I wanted a more robust solution that would give me historical data, alerts, and a better overview of the system.
+In the my LinkedIn promo about the previous post I shared a screenshot of how I used to monitor my two A770 GPUs with `intel_gpu_top`, `docker stats` and `bashtop` in terminal windows side by side. It was clunky and not a solution for Kubernetes.
 
-{{< rawhtml >}}
-<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:7363286511296856065?collapsed=1" height="550" width="504" frameborder="0" allowfullscreen="" title="Embedded post"></iframe>
-{{< /rawhtml >}}
+[![Architecture diagram](/images/post-04/manual-monitoring.png)](/images/post-04/manual-monitoring.png)
 
-**Aim**
+
+### **Aim**
 
 1. See real GPU load and memory.
 2. See inference throughput and latency next to logs.
 
-**Stack**
+### **Stack**
 
 * Prometheus
-* xpumanager DaemonSet with a metrics endpoint
+* xpumanager
 * VictoriaLogs
-* Grafana dashboards and alerts
+* Grafana
+
+## **Actions I took**
+1) Deployed kube-prometheus-stack with Helm.
+2) Deployed xpumanager as a DaemonSet with nodeSelector.
+3) Configured service and ServiceMonitor for xpumanager and vLLM.
+4) Created Grafana dashboards for the `xpum_` metrics
+
+Intel's solution for monitoring Arc GPUs and Gaudi accelerators is called **xpumanager**. It exposes GPU metrics over HTTP in a Prometheus-compatible format. I deployed it as a DaemonSet but it's only on the GPU node. It's ServiceMonitor scrapes the `/metrics` endpoint and Prometheus stores the data. I then built a Grafana dashboard to visualize GPU metrics alongside inference throughput and latency from vLLM logs.
+
+| XPU metrics Dashboard | vLLM metrics Dashboard |
+|:--------------:|:-------------:|
+| [![XPU metrics Dashboard](/images/post-05/xpum.png)](/images/post-04/lens.png) | [![vLLM metrics Dashboard](/images/post-05/vllmm.png)](/images/post-05/vllmm.png) |
+
 
 **xpumanager problems I hit**
 

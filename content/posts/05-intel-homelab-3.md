@@ -33,6 +33,7 @@ tags = ["k8s", "mlops", "intel", "homelab", "devops", "gpu", "arc", "a770", "int
   - [**Aim**](#aim-2)
   - [**Stack**](#stack-2)
   - [**Actions I took**](#actions-i-took-2)
+  - [**Challenges**](#challenges-2)
 - [05 Monitoring and Observability](#05-monitoring-and-observability)
 - [06 What was hard and what I’ll cover next](#06-what-was-hard-and-what-ill-cover-next)
 - [07 Closing](#07-closing)
@@ -469,74 +470,157 @@ This part of the stack is relatively straightforward as it basically provides th
 
 **OpenWebUI**
 
-* Helm deployment with SOPS-encrypted secrets.
-* Postgres for sessions/history. Redis for websockets/cache.
-  ➡️ Repo: [`deployments/openwebui/`](https://github.com/sonda-red/cluster-management/tree/main/deployments/openwebui)
-
-Env excerpt:
-
-```yaml
-env:
-  - name: DATABASE_URL
-    valueFrom:
-      secretKeyRef:
-        name: openwebui-db
-        key: url
-  - name: REDIS_URL
-    value: "redis://redis.redis:6379/0"
-```
+OpenWebUI is a web interface for LLMs that supports multiple backends, including vLLM. It has user management, chat history, and other features. Basically your own ChatGPT interface. I deployed it with Helm and used Postgres for sessions/history and Redis for websockets/cache.
 
 **vLLM with KitOps ModelKit and DRA claims**
+
+Why vLLM?
+
+Not much to say here. Locally, I've tried several options like ollama, llama.cpp and vLLM. I got them all to work with Intel GPUs, but vLLM was configurable and had sane explanations for using multiple GPUs with tensor parallelism. It also has a built-in OpenAI-compatible API server, which is a big plus if you plan on developing services that use the OpenAI API.
+
+Let's disect the key features of the deployment manifest. It's been redacted for showcase purposes, but you can find the full file in the repo link below:
 ➡️ **Exact file in repo:** [`deployments/vllm/vllm-14b-tp2/vllm-14b-tp2.yaml`](https://github.com/sonda-red/cluster-management/blob/main/deployments/vllm/vllm-14b-tp2/vllm-14b-tp2.yaml)
-
-*(Representative pattern below; args/labels live in the file above.)*
-
 ```yaml
+# ==============================================================================
+# vLLM 14B Model Deployment - Blog Showcase Version
+# ==============================================================================
+# This deployment demonstrates four key Kubernetes patterns:
+# 1. KitOps sidecar for model artifact management
+# 2. Dynamic Resource Allocation for GPU claims  
+# 3. Persistent Volume Claims for model storage
+# 4. vLLM configuration for tensor parallel inference
+# ==============================================================================
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: vllm-r1
+  name: vllm-14b-tp2
+  namespace: vllm
 spec:
   replicas: 1
-  selector: { matchLabels: { app: vllm-r1 } }
+  selector:
+    matchLabels: { app.kubernetes.io/name: vllm-14b-tp2 }
   template:
-    metadata: { labels: { app: vllm-r1 } }
+    metadata:
+      labels: { app.kubernetes.io/name: vllm-14b-tp2 }
     spec:
-      volumes:
-        - name: modelkit
-          emptyDir: {}
-      initContainers:
-        - name: kitops-init
-          image: ghcr.io/kitops-ml/kitops-init:latest
-          env:
-            - name: MODELKIT_REF
-              value: "harbor.sonda.red.local/modelkits/deepseek-r1:latest"
-            - name: UNPACK_PATH
-              value: "/model"
-          volumeMounts:
-            - name: modelkit
-              mountPath: /model
-      containers:
-        - name: vllm
-          image: vllm/vllm-openai:latest
-          args: ["--model", "/model"]
-          ports: [{ name: http, containerPort: 8000 }]
-          volumeMounts:
-            - name: modelkit
-              mountPath: /model
+      nodeSelector:
+        kubernetes.io/hostname: sonda-core
+      
+      # =======================================================================
+      # 🎯 KEY FEATURE #1: Dynamic Resource Allocation for GPU Claims
+      # =======================================================================
+      # Uses Kubernetes 1.30+ DRA to claim multiple GPUs for tensor parallelism
       resourceClaims:
-        - name: gpu0
-          resourceClaimTemplateName: intel-gpu-2   # or intel-gpu-1
-        - name: gpu1
-          resourceClaimTemplateName: intel-gpu-2
+        - name: intel-gpu-resource
+          resourceClaimTemplateName: dual-gpu-claim  # Claims 2x Intel GPUs
+      
+      # =======================================================================
+      # 🎯 KEY FEATURE #2: Persistent Volume Claims for Model Storage  
+      # =======================================================================
+      volumes:
+      - name: modelkit
+        persistentVolumeClaim:
+          claimName: vllm-modelkits  # Shared storage across vLLM instances
+      - name: dshm
+        emptyDir: { medium: Memory, sizeLimit: 16Gi }  # Shared memory for tensor parallel
+      
+      # =======================================================================
+      # 🎯 KEY FEATURE #3: KitOps Sidecar for Model Artifact Management
+      # =======================================================================
+      initContainers:
+      - name: kitops-init
+        image: ghcr.io/kitops-ml/kitops-init:v1.7.0
+        env:
+        - name: MODELKIT_REF
+          value: "harbor.harbor/sonda-red/ds-r1-qwen-14b:0.0.1"  # Model artifact in registry
+        - name: UNPACK_PATH
+          value: /data/ds-r1-qwen-14b  # Where to extract model files
+        - name: UNPACK_FILTER
+          value: model  # Only extract model weights, not datasets
+        - name: EXTRA_FLAGS
+          value: "--tls-verify=false --plain-http -vv"  # Registry connection flags
+        volumeMounts: 
+        - { name: modelkit, mountPath: /data/ds-r1-qwen-14b }
+      
+      # =======================================================================
+      # 🎯 KEY FEATURE #4: vLLM Configuration for Tensor Parallel Inference
+      # =======================================================================
+      containers:
+      - name: vllm
+        image: intelanalytics/ipex-llm-serving-xpu:0.8.3-b20
+        command: ["/bin/bash","-lc"]
+        args:
+          - |
+            python -m ipex_llm.vllm.xpu.entrypoints.openai.api_server \
+              --served-model-name ds-r1-qwen-14b \
+              --port 8014 \
+              --model /data/ds-r1-qwen-14b \
+              --device xpu \
+              --tensor-parallel-size 2 \        # Split across 2 GPUs
+              --gpu-memory-utilization 0.85 \   # Use 85% of GPU memory
+              --load-in-low-bit sym_int8 \      # 8-bit quantization
+              --max-model-len 2048 \             # Context window
+              --max-num-seqs 12                  # Concurrent sequences
+        
+        # Essential environment variables for Intel XPU multi-GPU setup
+        env:
+          - { name: ZE_AFFINITY_MASK, value: "0,1" }              # Use GPU 0 and 1
+          - { name: ONEAPI_DEVICE_SELECTOR, value: "level_zero:gpu" }
+          - { name: CCL_ATL_TRANSPORT, value: "ofi" }             # Multi-GPU communication
+        
+        ports: [{ containerPort: 8014 }]
+        
+        volumeMounts:
+          - { name: modelkit, mountPath: /data/ds-r1-qwen-14b }   # Model files from PVC
+          - { name: dshm, mountPath: /dev/shm }                   # Shared memory
+        
+        resources:
+          requests: { cpu: "8", memory: "28Gi" }
+          limits: { cpu: "16", memory: "36Gi" }
+          claims:
+            - name: intel-gpu-resource  # Claim the GPUs from DRA
+        
+        # Health checks optimized for LLM startup time
+        startupProbe:
+          tcpSocket: { port: 8014 }
+          periodSeconds: 10
+          failureThreshold: 120  # Allow 20 minutes for model loading
+
+---
+# ==============================================================================
+# Service: Expose vLLM API with OpenAI-compatible endpoints
+# ==============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-14b-tp2
+  namespace: vllm
+spec:
+  selector: { app.kubernetes.io/name: vllm-14b-tp2 }
+  ports: [{ name: http, port: 8014, targetPort: 8014 }]
+  type: ClusterIP
 ```
 
-**Free text**
-I stopped treating models like pets. Packaging with **KitOps** means the pod always gets the same bits, in the same place, from the same reference. vLLM serves the OpenAI API off a deterministic path, and OpenWebUI just points at it.
+### **Challenges**
+
+**Graceful shutdowns**
+
+The most impactful issue I hit was related to vLLM's handling of shutdown signals. When Kubernetes decides to terminate a pod (for example, during scaling down or rolling updates), it sends a SIGTERM signal to the main container process. vLLM needs to handle this signal gracefully to ensure that ongoing requests are completed and resources are freed properly.
+
+In the future I'll need to explore this further and write a custom lifecycle handler if needed. For now, I set a long `terminationGracePeriodSeconds` to give vLLM enough time to shut down properly. I see this topic is [still actively discussed in the vLLM community](https://github.com/vllm-project/vllm/issues/16667), so hopefully it will improve in future releases.
+
+> ...
+> The goal is that when vLLM shuts down - whether intentionally or due to an internal failure - the cause of shutdown should be logged with a useful level of detail, and the server's resources (especially GPU memory) should be freed.
+> ...
 
 ---
 
 ## 05 Monitoring and Observability
+
+In the my LinkedIn promo about the previous post I shared a screenshot of how I used to monitor my two A770 GPUs with `intel_gpu_top`, `docker stats` and `bashtop` in terminal windows side by side. It was a bit clunky, but it worked. However, I wanted a more robust solution that would give me historical data, alerts, and a better overview of the system.
+
+<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:7363286511296856065?collapsed=1" height="550" width="504" frameborder="0" allowfullscreen="" title="Embedded post"></iframe>
 
 **Aim**
 

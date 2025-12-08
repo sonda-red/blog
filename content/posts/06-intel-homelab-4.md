@@ -19,7 +19,6 @@ tags = ["k8s", "mlops", "intel", "homelab", "devops", "gpu", "arc", "a770", "int
 - [01 What made llm-d click for me](#01-what-made-llm-d-click-for-me)
 - [02 LLMs as CPUs, and what Kubernetes does not know yet](#02-llms-as-cpus-and-what-kubernetes-does-not-know-yet)
 - [03 How llm-d slots into the Intel MVP](#03-how-llm-d-slots-into-the-intel-mvp)
-- [](#)
 - [04 The three llm-d components in this cluster](#04-the-three-llm-d-components-in-this-cluster)
   - [04.1 modelservice: vLLM on Intel GPUs with DRA and ModelKit](#041-modelservice-vllm-on-intel-gpus-with-dra-and-modelkit)
   - [04.2 InferencePool: an LLM aware backend instead of a Service](#042-inferencepool-an-llm-aware-backend-instead-of-a-service)
@@ -128,6 +127,7 @@ From the vLLM pod’s perspective, nothing changed. It is still just serving tok
 A full diagram of the added components:
 
 [![Intel AI Inference Platform MVP 2: llm-d](/images/post-06/llm-d-full.png)](/images/post-06/llm-d-full.png)
+
 ---
 
 ## 04 The three llm-d components in this cluster

@@ -2,9 +2,9 @@
 authors = ["Kalin Daskalov"]
 title = "Lab Notes: Intel AI Inference Platform MVP 2 with llm-d"
 date = "2025-12-08"
-description = "With the cluster in place, I built the second layer of the stack."
+description = "Load balancing inference."
 categories = ["lab notes"]
-tags = ["k8s", "mlops", "intel", "homelab", "devops", "gpu", "arc", "a770", "intel-arc", "kubernetes", "k3s"]
+tags = ["k8s", "mlops", "intel", "homelab", "devops", "gpu", "arc", "a770", "intel-arc", "kubernetes", "k3s", llm-d, inference, deepseek, vllm]
 +++
 
 > Link to Part 3: [Intel AI Inference Platform MVP](https://blog.sonda.red/posts/05-intel-homelab-3/)

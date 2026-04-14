@@ -21,6 +21,7 @@ tags = ["k8s", "mlops", "intel", "homelab", "devops", "kubernetes", "k3s", "llm-
 - [03 Timeouts became part of architecture](#03-timeouts-became-part-of-architecture)
 - [04 Where the stack landed](#04-where-the-stack-landed)
 - [05 Closing notes](#05-closing-notes)
+- [References](#references)
 
 ---
 

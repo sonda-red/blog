@@ -1,7 +1,7 @@
 +++
 authors = ["Kalin Daskalov"]
 title = "Lab Notes: Why llm-d pushed me out of Ingress (and into agentgateway)"
-date = "2026-04-08"
+date = "2026-04-14"
 description = "When LLM routing became a scheduling problem, ingress stopped being enough."
 categories = ["lab notes"]
 tags = ["k8s", "mlops", "intel", "homelab", "devops", "kubernetes", "k3s", "llm-d", "gateway-api", "agentgateway", "fluxcd", "openwebui", "vllm"]
@@ -17,7 +17,7 @@ tags = ["k8s", "mlops", "intel", "homelab", "devops", "kubernetes", "k3s", "llm-
 - [Table of Contents](#table-of-contents)
 - [00 This started as "just expose one more endpoint"](#00-this-started-as-just-expose-one-more-endpoint)
 - [01 Why Ingress was no longer enough](#01-why-ingress-was-no-longer-enough)
-- [02 The second migration I did not plan](#02-the-second-migration-i-did-not-plan)
+- [02 The second migration](#02-the-second-migration)
 - [03 Timeouts became part of architecture](#03-timeouts-became-part-of-architecture)
 - [04 Where the stack landed](#04-where-the-stack-landed)
 - [05 Closing notes](#05-closing-notes)
@@ -26,27 +26,38 @@ tags = ["k8s", "mlops", "intel", "homelab", "devops", "kubernetes", "k3s", "llm-
 
 ## 00 This started as "just expose one more endpoint"
 
-I thought this would be a small networking change.
+In Part 4, I introduced `llm-d`. It was a solution after my original thought that inference on Kubernetes can follow a "standard" path of:
 
-At first, my mental model was simple: I already had UI traffic working, so I just needed one more route for inference and we were done.
+1. Get a model running locally
+2. Run it in a container
+3. Run it in Kubernetes
+4. Expose it with Ingress
 
-That model was wrong.
+Step 4 was the original plan. I had Ingress in place for all my other apps, so it felt natural to just add another route.
 
-Once `llm-d` became the center of inference, routing stopped being "send traffic to a Service" and became "send traffic to a scheduler that understands LLM backends." That subtle shift is where Ingress stopped fitting naturally.
+With one model pod, Ingress looks fine. With two replicas serving the same model, the question changes from "which Service" to "which replica should take this request right now." Ingress only sees HTTP endpoints. It does not know anything about decode pods, cache locality, or inference-specific backends, while llm-d's scheduler does.
 
-At the same time, the gateway implementation itself changed under me: while I was moving away from Ingress, `kgateway` was being deprecated and I had to migrate to `agentgateway` too.
+Once `llm-d` became the center of inference is where Ingress stopped fitting naturally.
 
-So this post is the bigger picture behind that migration path:
+The routing question was no longer "which Service" but "which inference pool backend." Inference pools are a new kind of backend that encode model-serving semantics, and they are only supported in Gateway API with the Inference Extension.
+
+Kubernetes docs now [explicitly recommend Gateway API over Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/#what-is-ingress), and the Ingress API is marked as frozen (stable, but no new feature development). Around the same time, `ingress-nginx` retirement was [announced on November 11, 2025](https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/), with best-effort maintenance through March 2026.
+
+So the path became clear: keep existing Ingress where needed, but invest new routing work in Gateway API.
+
+One dependency bump later, I learned this was not one migration but two:
 
 1. Ingress -> Gateway API because of `llm-d`
-2. `kgateway` -> `agentgateway` because the provider changed
-3. Timeout and connection handling changes because LLM traffic is long lived by default
+2. `kgateway` -> `agentgateway` because the provider path changed
+3. Timeout/connection policy changes because LLM traffic is long-lived by default
+
+I originally chose `kgateway` for its early Gateway API support, but the provider ecosystem is still evolving. When `agentgateway` emerged with a more focused vision on AI workloads, it made sense to follow that path.
 
 ---
 
 ## 01 Why Ingress was no longer enough
 
-`llm-d` depends on Gateway API Inference Extension CRDs, so Gateway API became a hard dependency, not a preference.
+`llm-d` depends on Gateway API Inference Extension CRDs, so Gateway API became a hard dependency in this repo.
 
 ```yaml
 # infrastructure/gateway-api/gateway-api-inference-extension.yaml
@@ -83,7 +94,7 @@ rules:
         port: 8200
 ```
 
-And the pool defines the model backend semantics (`v1` API, decode label matching, target port):
+And the pool encodes model-backend semantics (`v1` API, decode label selection, target port):
 
 ```yaml
 # deployments/llm-d/inference-scheduling/inferencepool/inferencepool-values.yaml
@@ -96,15 +107,27 @@ inferencePool:
       llm-d.ai/role: "decode"
 ```
 
-So this was the key realization for me: Ingress was still useful for web apps, but my inference path was no longer just web routing.
+At that point, I could have kept a mixed world: Ingress for apps, Gateway API for inference. I decided not to. Running two routing models in parallel was extra cognitive overhead for policy, debugging, and observability. Since `llm-d` already forced me to learn Gateway API, consolidating routes made more sense.
+
+The unplanned part came next.
 
 ---
 
-## 02 The second migration I did not plan
+## 02 The second migration
 
-I started the first migration with `kgateway` and in the middle of that work, the direction shifted to `agentgateway`.
+A concrete timeline from my infra repo:
 
-The base swap looked small:
+1. `f01d2cf` (2026-02-07): migrate app ingress routes to Gateway API
+2. `0a1415d` (2026-02-07): migrate infra ingress routes (`Flux`, `MinIO`, `Grafana`, `Prometheus`, `VictoriaLogs`)
+3. `829d7a4` (2026-02-13): split `OpenWebUI` route behavior and add long-stream policy
+4. `7b9a137` -> `4fde0b6` (2026-04-07): Gateway API dependency bump to `v1.5.1`, then revert to `v1.4.1`
+5. `1904628` + `8397a51` (2026-04-07): `kgateway` -> `agentgateway` refactor plus listener/route cleanup
+
+The revert on step 4 was where I learned about the provider migration. I had been following `kgateway` releases, but I missed the deprecation notice for AI Gateway support. When I bumped to `v1.5.1`, all my inference routes stopped working and I had to dig into release notes and code to understand why.
+
+The key nuance: `kgateway` was not dead. The AI/inference path moved. In `kgateway` 2.1 release notes, AI Gateway and Gateway API Inference Extension support on Envoy-based proxies was marked deprecated in favor of `agentgateway` proxy support, with removal planned in 2.2. Then 2.2 introduced dedicated `agentgateway.dev` APIs and a separate chart/controller split ([release notes](https://kgateway.dev/docs/envoy/latest/reference/release-notes/), [2.2 breaking changes](https://kgateway.dev/docs/2.2.x/release-notes/breaking-changes/)).
+
+The obvious diff looked small:
 
 ```diff
 # commit 1904628 (llm-d infra values)
@@ -115,10 +138,16 @@ The base swap looked small:
 + gatewayClassName: agentgateway
 ```
 
-But it was not just two lines. Listener names, route section references, and route shape had to move together.
+But there was more surface area:
 
 ```diff
-# commit 8397a51 (gateway/listener + route cleanup)
+# commit 1904628 (route parent refs)
+- namespace: kgateway-system
++ namespace: agentgateway-system
+```
+
+```diff
+# commit 8397a51 (listener + route cleanup)
 - - name: infer-https
 + - name: inference-gateway-https
 
@@ -129,13 +158,13 @@ But it was not just two lines. Listener names, route section references, and rou
 + # removed and consolidated around HTTPS listeners
 ```
 
-The lesson for me was practical: in Gateway API setups, `sectionName` is a real contract. Renaming listeners is easy. Renaming listeners without breaking every dependent `HTTPRoute` is the real work.
+After I stabilized these bindings, the next bottleneck was connection behavior.
 
 ---
 
 ## 03 Timeouts became part of architecture
 
-The long-connection behavior of LLM inference and UI sessions forced me to treat timeout config as core architecture, not optional tuning.
+The long-connection behavior of LLM inference and UI sessions forced me to treat timeout config as architecture, not optional tuning.
 
 For external inference traffic:
 
@@ -165,7 +194,7 @@ rules:
       request: "0s"
 ```
 
-If you are serving short APIs, default timeouts can be perfectly fine. If you are serving long streams and slower model turns, default assumptions can quietly wreck UX and make failures look random.
+If you serve short request/response APIs, defaults are often fine. If you serve token streams and slower model turns, default timeout assumptions can quietly wreck UX. I started receiving strange "connection reset" errors in OpenWebUI and llm-d, and it took a while to connect the dots that these were not random network issues but timeout policies kicking in.
 
 ---
 
@@ -197,8 +226,8 @@ This ended up cleaner than what I had before:
 
 1. Gateway API is now a stable dependency of the inference stack
 2. `llm-d` routing semantics are explicit in manifests
-3. The provider migration is complete and aligned with the current gateway control plane
-4. Long-lived connection behavior is handled where it should be: in route policy
+3. The provider migration is complete and aligned with the current control plane
+4. Long-lived connection behavior is handled in route policy, not left to defaults
 
 ---
 
@@ -206,10 +235,6 @@ This ended up cleaner than what I had before:
 
 What I expected to be one migration taught me three separate lessons:
 
-1. Inference routing is not generic web routing
-2. Gateway provider lifecycle matters as much as application lifecycle
-3. Timeout policy is part of product behavior when LLMs are in the loop
-
-I still think of this as MVP territory, but it is a more honest MVP now. The manifests encode the real behavior instead of relying on defaults and luck.
-
-In the next notes, I want to go deeper on request-level behavior through the pool itself: what gets routed where, and why.
+1. Inference routing is not generic web routing, I think I'm spending the bulk of my time on these issues because of the unique semantics of LLM workloads, not just because of the newness of Gateway API.
+2. Gateway provider lifecycle matters as much as application lifecycle, especially in a fast-evolving space like AI inference. I had to follow the provider ecosystem and be ready to adapt when the path changed. Things really are moving too fast. I go on a vacation and miss a release, and suddenly my whole routing layer breaks because of a provider migration I didn't know was coming.
+3. Timeout policy is part of product behavior when LLMs are in the loop, connection is more akin to a session than a request, and the "request" can be arbitrarily long.

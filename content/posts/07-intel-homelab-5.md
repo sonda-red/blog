@@ -37,7 +37,7 @@ Step 4 was the original plan. I had Ingress in place for all my other apps, so i
 
 With one model pod, Ingress looks fine. With two replicas serving the same model, the question changes from "which Service" to "which replica should take this request right now." Ingress only sees HTTP endpoints. It does not know anything about decode pods, cache locality, or inference-specific backends, while llm-d's scheduler does.
 
-Once `llm-d` became the center of inference is where Ingress stopped fitting naturally.
+Once `llm-d` became the center of inference, Ingress stopped fitting naturally.
 
 The routing question was no longer "which Service" but "which inference pool backend." Inference pools are a new kind of backend that encode model-serving semantics, and they are only supported in Gateway API with the Inference Extension.
 
@@ -45,11 +45,11 @@ Kubernetes docs now [explicitly recommend Gateway API over Ingress](https://kube
 
 So the path became clear: keep existing Ingress where needed, but invest new routing work in Gateway API.
 
-One dependency bump later, I learned this was not one migration but two:
+One dependency bump later, I learned this was not one migration but three:
 
 1. Ingress -> Gateway API because of `llm-d`
 2. `kgateway` -> `agentgateway` because the provider path changed
-3. Timeout/connection policy changes because LLM traffic is long-lived by default
+3. Default timeouts -> explicit timeout policies because LLM traffic is long-lived
 
 I originally chose `kgateway` for its early Gateway API support, but the provider ecosystem is still evolving. When `agentgateway` emerged with a more focused vision on AI workloads, it made sense to follow that path.
 
@@ -123,7 +123,7 @@ A concrete timeline from my infra repo:
 4. `7b9a137` -> `4fde0b6` (2026-04-07): Gateway API dependency bump to `v1.5.1`, then revert to `v1.4.1`
 5. `1904628` + `8397a51` (2026-04-07): `kgateway` -> `agentgateway` refactor plus listener/route cleanup
 
-The revert on step 4 was where I learned about the provider migration. I had been following `kgateway` releases, but I missed the deprecation notice for AI Gateway support. When I bumped to `v1.5.1`, all my inference routes stopped working and I had to dig into release notes and code to understand why.
+The revert in step 4 was where I learned about the provider migration. I had been following `kgateway` releases, but I missed the deprecation notice for AI Gateway support. When I bumped to `v1.5.1`, all my inference routes stopped working and I had to dig into release notes and code to understand why.
 
 The key nuance: `kgateway` was not dead. The AI/inference path moved. In `kgateway` 2.1 release notes, AI Gateway and Gateway API Inference Extension support on Envoy-based proxies was marked deprecated in favor of `agentgateway` proxy support, with removal planned in 2.2. Then 2.2 introduced dedicated `agentgateway.dev` APIs and a separate chart/controller split ([release notes](https://kgateway.dev/docs/envoy/latest/reference/release-notes/), [2.2 breaking changes](https://kgateway.dev/docs/2.2.x/release-notes/breaking-changes/)).
 
@@ -235,6 +235,20 @@ This ended up cleaner than what I had before:
 
 What I expected to be one migration taught me three separate lessons:
 
-1. Inference routing is not generic web routing, I think I'm spending the bulk of my time on these issues because of the unique semantics of LLM workloads, not just because of the newness of Gateway API.
+1. Inference routing is not generic web routing. I think I'm spending the bulk of my time on these issues because of the unique semantics of LLM workloads, not just because of the newness of Gateway API.
 2. Gateway provider lifecycle matters as much as application lifecycle, especially in a fast-evolving space like AI inference. I had to follow the provider ecosystem and be ready to adapt when the path changed. Things really are moving too fast. I go on a vacation and miss a release, and suddenly my whole routing layer breaks because of a provider migration I didn't know was coming.
-3. Timeout policy is part of product behavior when LLMs are in the loop, connection is more akin to a session than a request, and the "request" can be arbitrarily long.
+3. Timeout policy is part of product behavior when LLMs are in the loop. A connection is more akin to a session than a request, and the "request" can be arbitrarily long.
+
+---
+
+## References
+
+- [Kubernetes Gateway API](https://gateway-api.sigs.k8s.io/)
+- [Gateway API Inference Extension](https://github.com/kubernetes-sigs/gateway-api-inference-extension)
+- [llm-d](https://github.com/llm-d/llm-d)
+- [agentgateway](https://agentgateway.dev/)
+- [kgateway release notes](https://kgateway.dev/docs/envoy/latest/reference/release-notes/)
+- [kgateway 2.2 breaking changes](https://kgateway.dev/docs/2.2.x/release-notes/breaking-changes/)
+- [Kubernetes: What is Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/#what-is-ingress)
+- [ingress-nginx retirement announcement](https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/)
+- [Gateway API HTTP timeouts](https://gateway-api.sigs.k8s.io/guides/http-routing/#timeouts)

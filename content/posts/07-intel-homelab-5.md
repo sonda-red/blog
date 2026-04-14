@@ -15,17 +15,21 @@ tags = ["k8s", "mlops", "intel", "homelab", "devops", "kubernetes", "k3s", "llm-
 
 ## Table of Contents
 - [Table of Contents](#table-of-contents)
-- [00 This started as "just expose one more endpoint"](#00-this-started-as-just-expose-one-more-endpoint)
-- [01 Why Ingress was no longer enough](#01-why-ingress-was-no-longer-enough)
-- [02 The second migration](#02-the-second-migration)
-- [03 Timeouts became part of architecture](#03-timeouts-became-part-of-architecture)
+- [00 I came back from vacation to a broken routing layer](#00-i-came-back-from-vacation-to-a-broken-routing-layer)
+- [01 Why Ingress couldn't follow](#01-why-ingress-couldnt-follow)
+- [02 The migration I didn't plan for](#02-the-migration-i-didnt-plan-for)
+- [03 When timeouts become product behavior](#03-when-timeouts-become-product-behavior)
 - [04 Where the stack landed](#04-where-the-stack-landed)
-- [05 Closing notes](#05-closing-notes)
+- [05 Three lessons from three migrations](#05-three-lessons-from-three-migrations)
 - [References](#references)
 
 ---
 
-## 00 This started as "just expose one more endpoint"
+## 00 I came back from vacation to a broken routing layer
+
+So I went on vacation for a week. Before I left I had queued a minor version bump on the gateway provider. Came back, checked Flux, and nothing was routing. All inference traffic was dead. Turns out the provider had deprecated the AI Gateway path I was using and I just hadn't noticed the release notes.
+
+That was fun to debug on a Monday morning. But it also made me realize this whole thing was not one migration but three, and I should probably write down how I got here.
 
 In Part 4, I introduced `llm-d`. It was a solution after my original thought that inference on Kubernetes can follow a "standard" path of:
 
@@ -56,7 +60,7 @@ I originally chose `kgateway` for its early Gateway API support, but the provide
 
 ---
 
-## 01 Why Ingress was no longer enough
+## 01 Why Ingress couldn't follow
 
 `llm-d` depends on Gateway API Inference Extension CRDs, so Gateway API became a hard dependency in this repo.
 
@@ -108,13 +112,13 @@ inferencePool:
       llm-d.ai/role: "decode"
 ```
 
-At that point, I could have kept a mixed world: Ingress for apps, Gateway API for inference. I decided not to. Running two routing models in parallel was extra cognitive overhead for policy, debugging, and observability. Since `llm-d` already forced me to learn Gateway API, consolidating routes made more sense.
+At that point I could have just left Ingress in place for the non-inference apps and only used Gateway API for `llm-d`. I thought about it for maybe a day. Running two routing stacks in parallel sounded like the kind of decision I'd regret every time something broke and I had to check both. Since I already had to learn Gateway API anyway, I just moved everything over.
 
-The unplanned part came next.
+The part I didn't plan for came next.
 
 ---
 
-## 02 The second migration
+## 02 The migration I didn't plan for
 
 A concrete timeline from my infra repo:
 
@@ -163,7 +167,7 @@ After I stabilized these bindings, the next bottleneck was connection behavior.
 
 ---
 
-## 03 Timeouts became part of architecture
+## 03 When timeouts become product behavior
 
 The long-connection behavior of LLM inference and UI sessions forced me to treat timeout config as architecture, not optional tuning.
 
@@ -232,12 +236,12 @@ This ended up cleaner than what I had before:
 
 ---
 
-## 05 Closing notes
+## 05 Three lessons from three migrations
 
 What I expected to be one migration taught me three separate lessons:
 
 1. Inference routing is not generic web routing. I think I'm spending the bulk of my time on these issues because of the unique semantics of LLM workloads, not just because of the newness of Gateway API.
-2. Gateway provider lifecycle matters as much as application lifecycle, especially in a fast-evolving space like AI inference. I had to follow the provider ecosystem and be ready to adapt when the path changed. Things really are moving too fast. I go on a vacation and miss a release, and suddenly my whole routing layer breaks because of a provider migration I didn't know was coming.
+2. Gateway provider lifecycle matters as much as application lifecycle. I missed one release, went on vacation, came back to a dead routing layer. Things are moving fast in this space and nobody is going to wait for you to catch up.
 3. Timeout policy is part of product behavior when LLMs are in the loop. A connection is more akin to a session than a request, and the "request" can be arbitrarily long.
 
 ---

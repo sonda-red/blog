@@ -288,7 +288,7 @@ flowchart LR
         pool["InferencePool\n:8200"]
         epp["EPP\n(Endpoint Picker)"]
 
-        subgraph decode["Decode Pods"]
+        subgraph decode["Decode Pods\n(label: llm-d.ai/role=decode)"]
             ds1["DeepSeek-R1-Llama-8B\nReplica 1 · TP1\nArc B60 Pro (DRA)"]
             ds2["DeepSeek-R1-Llama-8B\nReplica 2 · TP1\nArc B60 Pro (DRA)"]
             qw["DeepSeek-R1-Qwen-1.5B\nCPU only\n(no DRA)"]
@@ -297,10 +297,11 @@ flowchart LR
 
     client -->|HTTPS| gw
     gw -->|"chat.sonda.red.intra"| owui
+    owui -->|"OpenAI API\ninfer.sonda.red.intra"| gw
     gw -->|"infer.sonda.red.intra"| ext
     ext --> int_gw
     int_gw --> pool
-    pool --> epp
+    pool -->|"selects by label"| epp
     epp -->|"cache-aware\nselection"| ds1
     epp -->|"cache-aware\nselection"| ds2
     epp -->|"cache-aware\nselection"| qw
@@ -310,7 +311,7 @@ flowchart LR
     style epp fill:#8e44ad,color:#fff
     style decode fill:#2c3e50,color:#fff
 {{< /mermaid >}}
-*Stage 3: agentgateway + llm-d*
+*Stage 3: agentgateway + llm-d — OpenWebUI reaches models through the same infer.sonda.red.intra endpoint. All three decode pods share the InferencePool behind a single API surface.*
 
 ```yaml
 # infrastructure/agentgateway/gateway.yaml

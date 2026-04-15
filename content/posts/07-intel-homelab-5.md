@@ -268,50 +268,63 @@ flowchart LR
 {{< /mermaid >}}
 *Stage 2: kgateway — the inference path (❌) broke when AI Gateway support was deprecated*
 
-The red link is the one that broke. kgateway 2.1 deprecated AI Gateway and Inference Extension support on Envoy proxies, and 2.2 removed it. The inference path moved to `agentgateway`, and everything had to follow:
+The red link is the one that broke. kgateway 2.1 deprecated AI Gateway and Inference Extension support on Envoy proxies, and 2.2 removed it. The inference path moved to `agentgateway`, and everything had to follow.
+
+The clearest way to think about the current layout is to separate public endpoints from inference-internal routing. `chat.sonda.red.intra` is the browser UI. `infer.sonda.red.intra` is the single OpenAI-compatible API surface (`/v1/...`) used by OpenWebUI and direct clients. The hostname tells you which API surface you are hitting; the request body still carries `model=...`, and the llm-d layer still has to pick a concrete backend pod.
 
 {{< mermaid >}}
-flowchart LR
-    client["Client"]
+flowchart TB
+    browser["Browser user"]
+    api["Direct API client"]
 
-    subgraph agtw["agentgateway-system"]
+    subgraph public["Public entrypoints"]
         gw["main-gateway\n(agentgateway)\nHTTPS :443"]
     end
 
     subgraph owui_ns["openwebui"]
-        owui["OpenWebUI\n:80"]
+        owui["OpenWebUI\nchat.sonda.red.intra"]
     end
 
-    subgraph llmd["llm-d"]
-        ext["HTTPRoute\ninfer.sonda.red.intra"]
-        int_gw["inference-gateway\n(agentgateway)\n:80"]
-        pool["InferencePool\n:8200"]
-        epp["EPP\n(Endpoint Picker)"]
+    subgraph llmd["llm-d inference layer"]
+        ext["External HTTPRoute\nhostname: infer.sonda.red.intra"]
+        int_gw["llm-d inference gateway\nService :80"]
+        route["Internal HTTPRoute\nbackendRef -> InferencePool"]
+        pool["InferencePool\nselector: llm-d.ai/role=decode"]
+        epp["EPP\ncache/load-aware chooser"]
 
-        subgraph decode["Decode Pods\n(label: llm-d.ai/role=decode)"]
-            ds1["DeepSeek-R1-Llama-8B\nReplica 1 · TP1\nArc B60 Pro (DRA)"]
-            ds2["DeepSeek-R1-Llama-8B\nReplica 2 · TP1\nArc B60 Pro (DRA)"]
-            qw["DeepSeek-R1-Qwen-1.5B\nCPU only\n(no DRA)"]
+        subgraph decode["Candidate decode backends"]
+            ds1["Decode pod A\nexample: DeepSeek-R1-Llama-8B"]
+            ds2["Decode pod B\nexample: DeepSeek-R1-Llama-8B"]
+            ds3["Decode pod C\nexample: DeepSeek-R1-Qwen-1.5B"]
         end
     end
 
-    client -->|HTTPS| gw
-    gw -->|"chat.sonda.red.intra"| owui
-    owui -->|"OpenAI API\ninfer.sonda.red.intra"| gw
-    gw -->|"infer.sonda.red.intra"| ext
-    ext --> int_gw
-    int_gw --> pool
-    pool -->|"selects by label"| epp
-    epp -->|"cache-aware\nselection"| ds1
-    epp -->|"cache-aware\nselection"| ds2
-    epp -->|"cache-aware\nselection"| qw
+    browser -->|HTTPS\nchat.sonda.red.intra| gw
+    gw -->|UI traffic| owui
+    owui -->|OpenAI API call\ninfer.sonda.red.intra\nPOST /v1/...| gw
+    api -->|HTTPS\ninfer.sonda.red.intra\nPOST /v1/...| gw
+    gw -->|forward infer.sonda.red.intra traffic| int_gw
+    int_gw -. consults before routing .-> epp
+    epp -. chooses one matching backend .-> ds1
+    epp -. chooses one matching backend .-> ds2
+    epp -. chooses one matching backend .-> ds3
+
+    ext -. attaches hostname to .-> gw
+    ext -. forwards to .-> int_gw
+    route -. attaches to .-> int_gw
+    route -. backendRef .-> pool
+    pool -. selects pods by label .-> ds1
+    pool -. selects pods by label .-> ds2
+    pool -. selects pods by label .-> ds3
 
     style gw fill:#2980b9,color:#fff
     style pool fill:#27ae60,color:#fff
     style epp fill:#8e44ad,color:#fff
     style decode fill:#2c3e50,color:#fff
 {{< /mermaid >}}
-*Stage 3: agentgateway + llm-d — OpenWebUI reaches models through the same infer.sonda.red.intra endpoint. All three decode pods share the InferencePool behind a single API surface.*
+*Stage 3: agentgateway + llm-d. Solid arrows show request flow. Dashed arrows show configuration and backend selection. `chat.sonda.red.intra` serves the UI; `infer.sonda.red.intra` is the single OpenAI-compatible API surface; llm-d still chooses one concrete decode backend for each request.*
+
+This was the mental model I was missing at first. `HTTPRoute` and `InferencePool` are not extra network hops in the same sense as Gateway -> pod. They are the objects that tell the llm-d inference gateway how to resolve a request. The actual runtime path is simpler: request hits `main-gateway`, inference traffic gets handed to the llm-d gateway, EPP picks one backend from the pool, and only then does a specific decode pod answer.
 
 ```yaml
 # infrastructure/agentgateway/gateway.yaml

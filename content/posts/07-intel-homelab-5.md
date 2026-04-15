@@ -275,12 +275,12 @@ The clearest way to think about the current layout is to separate public endpoin
 {{< mermaid >}}
 flowchart TB
 
-    classDef client fill:#0b5ed7,color:#fff,stroke:#084298,stroke-width:1.5px;
-    classDef ingress fill:#0d6efd,color:#fff,stroke:#084298,stroke-width:2px;
-    classDef app fill:#fd7e14,color:#fff,stroke:#b35a00,stroke-width:1.5px;
-    classDef runtime fill:#198754,color:#fff,stroke:#0f5132,stroke-width:2px;
-    classDef backend fill:#495057,color:#fff,stroke:#212529,stroke-width:1.5px;
-    classDef control fill:#6f42c1,color:#fff,stroke:#4c2c92,stroke-width:1.5px;
+    classDef client fill:#f7f7fb,stroke:#3f3f58,color:#2b2b35,stroke-width:1.6px;
+    classDef ingress fill:#f7f7fb,stroke:#3f3f58,color:#2b2b35,stroke-width:1.6px;
+    classDef app fill:#f7f9ff,stroke:#5b7cfa,color:#2b2b35,stroke-width:2px;
+    classDef runtime fill:#f4efff,stroke:#7b61ff,color:#2b2b35,stroke-width:2px;
+    classDef backend fill:#faeff7,stroke:#b44b8a,color:#2b2b35,stroke-width:2px;
+    classDef control fill:#f4efff,stroke:#7b61ff,color:#2b2b35,stroke-width:2px;
 
     subgraph clients["Clients"]
         direction LR

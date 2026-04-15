@@ -42,10 +42,7 @@ Step 4 was the original plan. I had Ingress in place for all my other apps, so i
 
 With one model pod, Ingress looks fine. With two replicas serving the same model, the question changes from "which Service" to "which replica should take this request right now." Ingress only sees HTTP endpoints. It does not know anything about decode pods, cache locality, or inference-specific backends, while llm-d's scheduler does.
 
-```mermaid
----
-title: "Stage 1: Ingress NGINX"
----
+{{< mermaid >}}
 flowchart LR
     client["Client"]
     ingress["ingress-nginx\n(kube-system)\nLoadBalancer\n192.168.1.240"]
@@ -72,7 +69,8 @@ flowchart LR
 
     style ingress fill:#c0392b,color:#fff
     style svc fill:#e67e22,color:#fff
-```
+{{< /mermaid >}}
+*Stage 1: Ingress NGINX*
 
 Once `llm-d` became the center of inference, Ingress stopped fitting naturally.
 
@@ -239,10 +237,7 @@ If you serve short request/response APIs, defaults are often fine. If you serve 
 
 The current gateway shape is one shared `main-gateway` in `agentgateway-system`, with explicit HTTPS listeners per hostname. But to appreciate how it got here, here's what the kgateway stage looked like before it broke:
 
-```mermaid
----
-title: "Stage 2: kgateway (worked, then broke)"
----
+{{< mermaid >}}
 flowchart LR
     client["Client"]
 
@@ -261,7 +256,7 @@ flowchart LR
 
     client -->|HTTPS| gw
     gw -->|"chat.sonda.red.intra"| owui
-    gw -->|"infer.sonda.red.intra"| int_gw
+    gw -->|"infer.sonda.red.intra ❌"| int_gw
     int_gw --> pool
     pool --> epp
     epp --> vllm
@@ -270,16 +265,12 @@ flowchart LR
     style int_gw fill:#d4ac0d,color:#000
     style pool fill:#27ae60,color:#fff
     style epp fill:#8e44ad,color:#fff
-
-    linkStyle 2 stroke:#e74c3c,stroke-width:3px
-```
+{{< /mermaid >}}
+*Stage 2: kgateway — the inference path (❌) broke when AI Gateway support was deprecated*
 
 The red link is the one that broke. kgateway 2.1 deprecated AI Gateway and Inference Extension support on Envoy proxies, and 2.2 removed it. The inference path moved to `agentgateway`, and everything had to follow:
 
-```mermaid
----
-title: "Stage 3: agentgateway + llm-d"
----
+{{< mermaid >}}
 flowchart LR
     client["Client"]
 
@@ -316,7 +307,8 @@ flowchart LR
     style pool fill:#27ae60,color:#fff
     style epp fill:#8e44ad,color:#fff
     style decode fill:#2c3e50,color:#fff
-```
+{{< /mermaid >}}
+*Stage 3: agentgateway + llm-d*
 
 ```yaml
 # infrastructure/agentgateway/gateway.yaml

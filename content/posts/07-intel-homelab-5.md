@@ -44,6 +44,14 @@ With one model pod, Ingress looks fine. With two replicas serving the same model
 
 {{< mermaid >}}
 flowchart LR
+
+    classDef node fill:#f7f7fb,stroke:#3f3f58,color:#2b2b35,stroke-width:1.6px
+    classDef blue fill:#f7f9ff,stroke:#5b7cfa,color:#2b2b35,stroke-width:2px
+    classDef orange fill:#fff8ef,stroke:#c98717,color:#2b2b35,stroke-width:2px
+    classDef purple fill:#f4efff,stroke:#7b61ff,color:#2b2b35,stroke-width:2px
+    classDef pink fill:#faeff7,stroke:#b44b8a,color:#2b2b35,stroke-width:2px
+    classDef note fill:#ececf2,stroke:#c8cad6,color:#44475a,stroke-width:1.2px
+
     client["Client"]
     ingress["ingress-nginx\n(kube-system)\nLoadBalancer\n192.168.1.240"]
 
@@ -67,8 +75,10 @@ flowchart LR
     svc --> vllm1
     svc --> vllm2
 
-    style ingress fill:#c0392b,color:#fff
-    style svc fill:#e67e22,color:#fff
+    class client,ingress node
+    class owui,minio,grafana blue
+    class svc orange
+    class vllm1,vllm2 pink
 {{< /mermaid >}}
 *Stage 1: Ingress NGINX*
 
@@ -239,6 +249,14 @@ The current gateway shape is one shared `main-gateway` in `agentgateway-system`,
 
 {{< mermaid >}}
 flowchart LR
+
+    classDef node fill:#f7f7fb,stroke:#3f3f58,color:#2b2b35,stroke-width:1.6px
+    classDef blue fill:#f7f9ff,stroke:#5b7cfa,color:#2b2b35,stroke-width:2px
+    classDef orange fill:#fff8ef,stroke:#c98717,color:#2b2b35,stroke-width:2px
+    classDef purple fill:#f4efff,stroke:#7b61ff,color:#2b2b35,stroke-width:2px
+    classDef pink fill:#faeff7,stroke:#b44b8a,color:#2b2b35,stroke-width:2px
+    classDef note fill:#ececf2,stroke:#c8cad6,color:#44475a,stroke-width:1.2px
+
     client["Client"]
 
     subgraph kgw["kgateway-system"]
@@ -261,10 +279,10 @@ flowchart LR
     pool --> epp
     epp --> vllm
 
-    style gw fill:#d4ac0d,color:#000
-    style int_gw fill:#d4ac0d,color:#000
-    style pool fill:#27ae60,color:#fff
-    style epp fill:#8e44ad,color:#fff
+    class client,gw node
+    class owui blue
+    class int_gw,pool,epp purple
+    class vllm pink
 {{< /mermaid >}}
 *Stage 2: kgateway — the inference path (❌) broke when AI Gateway support was deprecated*
 
@@ -275,12 +293,12 @@ The clearest way to think about the current layout is to separate public endpoin
 {{< mermaid >}}
 flowchart TB
 
-    classDef client fill:#f7f7fb,stroke:#3f3f58,color:#2b2b35,stroke-width:1.6px;
-    classDef ingress fill:#f7f7fb,stroke:#3f3f58,color:#2b2b35,stroke-width:1.6px;
-    classDef app fill:#f7f9ff,stroke:#5b7cfa,color:#2b2b35,stroke-width:2px;
-    classDef runtime fill:#f4efff,stroke:#7b61ff,color:#2b2b35,stroke-width:2px;
-    classDef backend fill:#faeff7,stroke:#b44b8a,color:#2b2b35,stroke-width:2px;
-    classDef control fill:#f4efff,stroke:#7b61ff,color:#2b2b35,stroke-width:2px;
+    classDef node fill:#f7f7fb,stroke:#3f3f58,color:#2b2b35,stroke-width:1.6px
+    classDef blue fill:#f7f9ff,stroke:#5b7cfa,color:#2b2b35,stroke-width:2px
+    classDef orange fill:#fff8ef,stroke:#c98717,color:#2b2b35,stroke-width:2px
+    classDef purple fill:#f4efff,stroke:#7b61ff,color:#2b2b35,stroke-width:2px
+    classDef pink fill:#faeff7,stroke:#b44b8a,color:#2b2b35,stroke-width:2px
+    classDef note fill:#ececf2,stroke:#c8cad6,color:#44475a,stroke-width:1.2px
 
     subgraph clients["Clients"]
         direction LR
@@ -329,12 +347,10 @@ flowchart TB
     pool -.->|"select by label"| ds2
     pool -.->|"select by label"| ds3
 
-    class browser,api client
-    class gw ingress
-    class owui app
-    class infer,epp runtime
-    class ds1,ds2,ds3 backend
-    class ext,route,pool control
+    class browser,api,gw node
+    class owui blue
+    class infer,epp,ext,route,pool purple
+    class ds1,ds2,ds3 pink
 {{< /mermaid >}}
 *Stage 3: agentgateway + llm-d. Solid arrows show request flow. Dashed arrows show configuration and backend selection. `chat.sonda.red.intra` serves the UI; `infer.sonda.red.intra` is the single OpenAI-compatible API surface; llm-d still chooses one concrete decode backend for each request.*
 

@@ -274,53 +274,67 @@ The clearest way to think about the current layout is to separate public endpoin
 
 {{< mermaid >}}
 flowchart TB
-    browser["Browser user"]
-    api["Direct API client"]
 
-    subgraph public["Public entrypoints"]
-        gw["main-gateway\n(agentgateway)\nHTTPS :443"]
+    classDef client fill:#0b5ed7,color:#fff,stroke:#084298,stroke-width:1.5px;
+    classDef ingress fill:#0d6efd,color:#fff,stroke:#084298,stroke-width:2px;
+    classDef app fill:#fd7e14,color:#fff,stroke:#b35a00,stroke-width:1.5px;
+    classDef runtime fill:#198754,color:#fff,stroke:#0f5132,stroke-width:2px;
+    classDef backend fill:#495057,color:#fff,stroke:#212529,stroke-width:1.5px;
+    classDef control fill:#6f42c1,color:#fff,stroke:#4c2c92,stroke-width:1.5px;
+
+    subgraph clients["Clients"]
+        direction LR
+        browser["Browser user"]
+        api["Direct API client"]
     end
 
-    subgraph owui_ns["openwebui"]
-        owui["OpenWebUI\nchat.sonda.red.intra"]
-    end
+    subgraph traffic["Live request path"]
+        direction LR
+        gw["1. Main gateway<br/>agentgateway<br/>HTTPS :443"]
+        owui["2a. OpenWebUI<br/>chat.sonda.red.intra"]
+        infer["2b. llm-d inference gateway<br/>Service :80"]
+        epp["3. EPP<br/>cache/load-aware chooser"]
 
-    subgraph llmd["llm-d inference layer"]
-        ext["External HTTPRoute\nhostname: infer.sonda.red.intra"]
-        int_gw["llm-d inference gateway\nService :80"]
-        route["Internal HTTPRoute\nbackendRef -> InferencePool"]
-        pool["InferencePool\nselector: llm-d.ai/role=decode"]
-        epp["EPP\ncache/load-aware chooser"]
-
-        subgraph decode["Candidate decode backends"]
-            ds1["Decode pod A\nexample: DeepSeek-R1-Llama-8B"]
-            ds2["Decode pod B\nexample: DeepSeek-R1-Llama-8B"]
-            ds3["Decode pod C\nexample: DeepSeek-R1-Qwen-1.5B"]
+        subgraph pods["4. Candidate decode backends"]
+            direction LR
+            ds1["Pod A<br/>DeepSeek R1 Llama 8B"]
+            ds2["Pod B<br/>DeepSeek R1 Llama 8B"]
+            ds3["Pod C<br/>Qwen 1.5B"]
         end
     end
 
-    browser -->|HTTPS\nchat.sonda.red.intra| gw
-    gw -->|UI traffic| owui
-    owui -->|OpenAI API call\ninfer.sonda.red.intra\nPOST /v1/...| gw
-    api -->|HTTPS\ninfer.sonda.red.intra\nPOST /v1/...| gw
-    gw -->|forward infer.sonda.red.intra traffic| int_gw
-    int_gw -. consults before routing .-> epp
-    epp -. chooses one matching backend .-> ds1
-    epp -. chooses one matching backend .-> ds2
-    epp -. chooses one matching backend .-> ds3
+    subgraph controlplane["Kubernetes control objects"]
+        direction LR
+        ext["External HTTPRoute<br/>infer.sonda.red.intra"]
+        route["Internal HTTPRoute"]
+        pool["InferencePool<br/>selector: llm-d.ai/role=decode"]
+    end
 
-    ext -. attaches hostname to .-> gw
-    ext -. forwards to .-> int_gw
-    route -. attaches to .-> int_gw
-    route -. backendRef .-> pool
-    pool -. selects pods by label .-> ds1
-    pool -. selects pods by label .-> ds2
-    pool -. selects pods by label .-> ds3
+    browser -->|"chat.sonda.red.intra"| gw
+    gw -->|"serve UI"| owui
+    owui -->|"infer.sonda.red.intra<br/>POST /v1/...<br/>model=..."| gw
+    api -->|"infer.sonda.red.intra<br/>POST /v1/...<br/>model=..."| gw
+    gw -->|"forward infer traffic"| infer
+    infer -.->|"consult EPP"| epp
+    epp -.->|"selected backend"| infer
+    infer --> ds1
+    infer --> ds2
+    infer --> ds3
 
-    style gw fill:#2980b9,color:#fff
-    style pool fill:#27ae60,color:#fff
-    style epp fill:#8e44ad,color:#fff
-    style decode fill:#2c3e50,color:#fff
+    ext -.->|"bind hostname"| gw
+    ext -.->|"forward"| infer
+    route -.->|"attach"| infer
+    route -.->|"backendRef"| pool
+    pool -.->|"select by label"| ds1
+    pool -.->|"select by label"| ds2
+    pool -.->|"select by label"| ds3
+
+    class browser,api client
+    class gw ingress
+    class owui app
+    class infer,epp runtime
+    class ds1,ds2,ds3 backend
+    class ext,route,pool control
 {{< /mermaid >}}
 *Stage 3: agentgateway + llm-d. Solid arrows show request flow. Dashed arrows show configuration and backend selection. `chat.sonda.red.intra` serves the UI; `infer.sonda.red.intra` is the single OpenAI-compatible API surface; llm-d still chooses one concrete decode backend for each request.*
 

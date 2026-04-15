@@ -19,9 +19,8 @@ style = "swapoff"
   #avatarurl = "images/avatar.png"
   gravatar = "kalin.daskalov@proton.me"
 
-  #faviconSVG = "/img/favicon.svg"
-  favicon_32 = "/images/sonda-red-logo.jpg"
-  #favicon_16 = "/img/favicon-16x16.png"
+  favicon_32 = "/images/sondrd-64.png"
+  favicon_16 = "/images/sondrd-64.png"
 
   since = 2023
 

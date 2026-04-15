@@ -7,6 +7,8 @@ categories = ["lab notes"]
 tags = ["k8s", "mlops", "intel", "homelab", "devops", "kubernetes", "k3s", "llm-d", "gateway-api", "agentgateway", "fluxcd", "openwebui", "vllm"]
 +++
 
+[![Why llm-d pushed me out of Ingress and into agentgateway](/images/post-07/ingress-gateway-api.jpg)](/images/post-07/ingress-gateway-api.jpg)
+
 > Link to Part 4: [Intel AI Inference Platform MVP 2 with llm-d](https://blog.sonda.red/posts/06-intel-homelab-4/)
 
 > Disclaimer: This is not production guidance and it is not sponsored. It documents what actually ran in my homelab. Please double-check before you roll it into your own setup.
@@ -41,6 +43,46 @@ In Part 4, I introduced `llm-d`. It was a solution after my original thought tha
 Step 4 was the original plan. I had Ingress in place for all my other apps, so it felt natural to just add another route.
 
 With one model pod, Ingress looks fine. With two replicas serving the same model, the question changes from "which Service" to "which replica should take this request right now." Ingress only sees HTTP endpoints. It does not know anything about decode pods, cache locality, or inference-specific backends, while llm-d's scheduler does.
+
+{{< mermaid >}}
+flowchart LR
+
+    classDef node fill:#f7f7fb,stroke:#3f3f58,color:#2b2b35,stroke-width:1.6px
+    classDef blue fill:#f7f9ff,stroke:#5b7cfa,color:#2b2b35,stroke-width:2px
+    classDef orange fill:#fff8ef,stroke:#c98717,color:#2b2b35,stroke-width:2px
+    classDef purple fill:#f4efff,stroke:#7b61ff,color:#2b2b35,stroke-width:2px
+    classDef pink fill:#faeff7,stroke:#b44b8a,color:#2b2b35,stroke-width:2px
+    classDef note fill:#ececf2,stroke:#c8cad6,color:#44475a,stroke-width:1.2px
+
+    client["Client"]
+    ingress["ingress-nginx\n(kube-system)\nLoadBalancer\n192.168.1.240"]
+
+    subgraph apps["Apps"]
+        owui["OpenWebUI"]
+        minio["MinIO"]
+        grafana["Grafana"]
+    end
+
+    subgraph inference["Inference"]
+        svc["vLLM Service\n(round-robin)"]
+        vllm1["vLLM pod\n(GPU 1)"]
+        vllm2["vLLM pod\n(GPU 2)"]
+    end
+
+    client -->|HTTPS| ingress
+    ingress --> owui
+    ingress --> minio
+    ingress --> grafana
+    ingress -->|"same as any\nother Service"| svc
+    svc --> vllm1
+    svc --> vllm2
+
+    class client,ingress node
+    class owui,minio,grafana blue
+    class svc orange
+    class vllm1,vllm2 pink
+{{< /mermaid >}}
+*Stage 1: Ingress NGINX*
 
 Once `llm-d` became the center of inference, Ingress stopped fitting naturally.
 
@@ -205,7 +247,116 @@ If you serve short request/response APIs, defaults are often fine. If you serve 
 
 ## 04 Where the stack landed
 
-The current gateway shape is one shared `main-gateway` in `agentgateway-system`, with explicit HTTPS listeners per hostname.
+The current gateway shape is one shared `main-gateway` in `agentgateway-system`, with explicit HTTPS listeners per hostname. But to appreciate how it got here, here's what the kgateway stage looked like before it broke:
+
+{{< mermaid >}}
+flowchart LR
+
+    classDef node fill:#f7f7fb,stroke:#3f3f58,color:#2b2b35,stroke-width:1.6px
+    classDef blue fill:#f7f9ff,stroke:#5b7cfa,color:#2b2b35,stroke-width:2px
+    classDef orange fill:#fff8ef,stroke:#c98717,color:#2b2b35,stroke-width:2px
+    classDef purple fill:#f4efff,stroke:#7b61ff,color:#2b2b35,stroke-width:2px
+    classDef pink fill:#faeff7,stroke:#b44b8a,color:#2b2b35,stroke-width:2px
+    classDef note fill:#ececf2,stroke:#c8cad6,color:#44475a,stroke-width:1.2px
+
+    client["Client"]
+
+    subgraph kgw["kgateway-system"]
+        gw["main-gateway\n(kgateway)\nHTTPS :443"]
+    end
+
+    subgraph llmd["llm-d"]
+        int_gw["inference-gateway\n(kgateway)\n:80"]
+        pool["InferencePool\n:8200"]
+        epp["EPP"]
+        vllm["vLLM decode pods"]
+    end
+
+    owui["OpenWebUI"]
+
+    client -->|HTTPS| gw
+    gw -->|"chat.sonda.red.intra"| owui
+    gw -->|"infer.sonda.red.intra ❌"| int_gw
+    int_gw --> pool
+    pool --> epp
+    epp --> vllm
+
+    class client,gw node
+    class owui blue
+    class int_gw,pool,epp purple
+    class vllm pink
+{{< /mermaid >}}
+*Stage 2: kgateway — the inference path (❌) broke when AI Gateway support was deprecated*
+
+The red link is the one that broke. kgateway 2.1 deprecated AI Gateway and Inference Extension support on Envoy proxies, and 2.2 removed it. The inference path moved to `agentgateway`, and everything had to follow.
+
+The clearest way to think about the current layout is to separate public endpoints from inference-internal routing. `chat.sonda.red.intra` is the browser UI. `infer.sonda.red.intra` is the single OpenAI-compatible API surface (`/v1/...`) used by OpenWebUI and direct clients. The hostname tells you which API surface you are hitting; the request body still carries `model=...`, and the llm-d layer still has to pick a concrete backend pod.
+
+{{< mermaid >}}
+flowchart TB
+
+    classDef node fill:#f7f7fb,stroke:#3f3f58,color:#2b2b35,stroke-width:1.6px
+    classDef blue fill:#f7f9ff,stroke:#5b7cfa,color:#2b2b35,stroke-width:2px
+    classDef orange fill:#fff8ef,stroke:#c98717,color:#2b2b35,stroke-width:2px
+    classDef purple fill:#f4efff,stroke:#7b61ff,color:#2b2b35,stroke-width:2px
+    classDef pink fill:#faeff7,stroke:#b44b8a,color:#2b2b35,stroke-width:2px
+    classDef note fill:#ececf2,stroke:#c8cad6,color:#44475a,stroke-width:1.2px
+
+    subgraph clients["Clients"]
+        direction LR
+        browser["Browser user"]
+        api["Direct API client"]
+    end
+
+    subgraph traffic["Live request path"]
+        direction LR
+        gw["1. Main gateway<br/>agentgateway<br/>HTTPS :443"]
+        owui["2a. OpenWebUI<br/>chat.sonda.red.intra"]
+        infer["2b. llm-d inference gateway<br/>Service :80"]
+        epp["3. EPP<br/>cache/load-aware chooser"]
+
+        subgraph pods["4. Candidate decode backends"]
+            direction LR
+            ds1["Pod A<br/>DeepSeek R1 Llama 8B"]
+            ds2["Pod B<br/>DeepSeek R1 Llama 8B"]
+            ds3["Pod C<br/>Qwen 1.5B"]
+        end
+    end
+
+    subgraph controlplane["Kubernetes control objects"]
+        direction LR
+        ext["External HTTPRoute<br/>infer.sonda.red.intra"]
+        route["Internal HTTPRoute"]
+        pool["InferencePool<br/>selector: llm-d.ai/role=decode"]
+    end
+
+    browser -->|"chat.sonda.red.intra"| gw
+    gw -->|"serve UI"| owui
+    owui -->|"infer.sonda.red.intra<br/>POST /v1/...<br/>model=..."| gw
+    api -->|"infer.sonda.red.intra<br/>POST /v1/...<br/>model=..."| gw
+    gw -->|"forward infer traffic"| infer
+    infer -.->|"consult EPP"| epp
+    epp -.->|"selected backend"| infer
+    infer --> ds1
+    infer --> ds2
+    infer --> ds3
+
+    ext -.->|"bind hostname"| gw
+    ext -.->|"forward"| infer
+    route -.->|"attach"| infer
+    route -.->|"backendRef"| pool
+    pool -.->|"select by label"| ds1
+    pool -.->|"select by label"| ds2
+    pool -.->|"select by label"| ds3
+
+    class browser,api,gw node
+    class owui blue
+    class infer,epp,ext,route,pool purple
+    class ds1,ds2,ds3 pink
+{{< /mermaid >}}
+*Stage 3: agentgateway + llm-d. Solid arrows show request flow. Dashed arrows show configuration and backend selection. `chat.sonda.red.intra` serves the UI; `infer.sonda.red.intra` is the single OpenAI-compatible API surface; llm-d still chooses one concrete decode backend for each request.*
+
+This was the mental model I was missing at first. `HTTPRoute` and `InferencePool` are not extra network hops in the same sense as Gateway -> pod. They are the objects that tell the llm-d inference gateway how to resolve a request. The actual runtime path is simpler: request hits `main-gateway`, inference traffic gets handed to the llm-d gateway, EPP picks one backend from the pool, and only then does a specific decode pod answer.
 
 ```yaml
 # infrastructure/agentgateway/gateway.yaml

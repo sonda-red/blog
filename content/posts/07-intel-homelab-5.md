@@ -289,7 +289,8 @@ flowchart LR
         epp["EPP\n(Endpoint Picker)"]
 
         subgraph decode["Decode Pods"]
-            ds["DeepSeek-R1-Llama-8B\nTP2 on 2x Arc B60 Pro\n(DRA: dual-gpu-claim)"]
+            ds1["DeepSeek-R1-Llama-8B\nReplica 1 · TP1\nArc B60 Pro (DRA)"]
+            ds2["DeepSeek-R1-Llama-8B\nReplica 2 · TP1\nArc B60 Pro (DRA)"]
             qw["DeepSeek-R1-Qwen-1.5B\nCPU only\n(no DRA)"]
         end
     end
@@ -300,7 +301,8 @@ flowchart LR
     ext --> int_gw
     int_gw --> pool
     pool --> epp
-    epp -->|"cache-aware\nselection"| ds
+    epp -->|"cache-aware\nselection"| ds1
+    epp -->|"cache-aware\nselection"| ds2
     epp -->|"cache-aware\nselection"| qw
 
     style gw fill:#2980b9,color:#fff
